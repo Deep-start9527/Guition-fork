@@ -19,3 +19,4 @@ jobs:
           namespace: guition-jc
           components: |
             esp_lcd_axs15260:components/lcd/esp_lcd_axs15260
+            esp_lcd_touch_gsl3680:components/touch/esp_lcd_touch_gsl3680
