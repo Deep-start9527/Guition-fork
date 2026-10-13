@@ -1,0 +1,19 @@
+version: 1.0.0
+description: ESP LCD AXS15260 RGB display and I2C touch controller
+license: MIT
+dependencies:
+  esp_lcd_touch:
+    version: ^1.2.0
+    public: true
+  idf: '>=5.2'
+files:
+  exclude:
+  - tests/**/*
+  - '**/build*/**/*'
+  - '**/managed_components/**/*'
+  - '**/*.log'
+  - '**/*.tgz'
+url: https://github.com/Guition-JC/Guition
+repository: https://github.com/Guition-JC/Guition.git
+repository_info:
+  path: components/lcd/esp_lcd_axs15260

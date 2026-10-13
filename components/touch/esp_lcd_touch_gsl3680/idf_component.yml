@@ -1,0 +1,25 @@
+version: 0.1.0
+description: GSL3680 I2C touch driver with the Guition JC8012P4A1C firmware
+license: MIT
+tags:
+- lcd
+- touch
+- gsl3680
+dependencies:
+  idf: '>=6.1.0,<6.2.0'
+  espressif/esp_lcd_touch:
+    version: ==1.2.1
+    public: true
+files:
+  exclude:
+  - tests/**/*
+  - '**/build/**'
+  - '**/managed_components/**'
+  - '**/build-*/**/*'
+  - '**/build_*/**/*'
+  - '**/dist/**/*'
+  - '**/*.log'
+url: https://github.com/Guition-JC/Guition
+repository: https://github.com/Guition-JC/Guition.git
+repository_info:
+  path: components/touch/esp_lcd_touch_gsl3680
