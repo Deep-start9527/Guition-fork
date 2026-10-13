@@ -1,0 +1,9 @@
+build/
+build-*/
+build_*/
+dist/
+managed_components/
+__pycache__/
+*.log
+test/
+tests/

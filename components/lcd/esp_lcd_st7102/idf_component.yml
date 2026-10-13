@@ -1,0 +1,19 @@
+version: 0.2.0
+description: ST7102 RGB display and touch controller using ESP LCD panel IO
+license: MIT
+dependencies:
+  idf: '>=5.3'
+  espressif/esp_lcd_touch:
+    version: ^1.2.1
+    public: true
+files:
+  exclude:
+  - tests/**/*
+  - '**/build*/**/*'
+  - '**/managed_components/**/*'
+  - '**/*.log'
+  - '**/*.tgz'
+url: https://github.com/Guition-JC/Guition
+repository: https://github.com/Guition-JC/Guition.git
+repository_info:
+  path: components/lcd/esp_lcd_st7102
