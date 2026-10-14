@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3
+
+- Add the `display_lv_demo_widgets` example with LVGL Widgets, Board Manager display initialization and touch input.
+- Register the example at `example/display/display_lv_demo_widgets` for publication to the ESP Component Registry.
+- Correct the upstream repository metadata to `Guition-JC/Guition` and the component path to `components/board/guition_boards`.
+- Exclude local reference documents, development tools and editor settings from release archives.
+- Update the README version, installation command and display example link.
+
 ## 0.1.2
 
 - Add the `jc8048f543` ESP32-S31 board definition with the same peripheral, device and SDK configuration as `jc8048f550` for a different physical screen size.

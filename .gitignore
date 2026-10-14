@@ -1,0 +1,38 @@
+# ESP-IDF build output (including common custom build directory names)
+build/
+build-*/
+build_*/
+dist/
+gen_bmgr_codes/
+
+# Components downloaded by the ESP-IDF Component Manager
+managed_components/
+dependencies.lock
+
+# Generated configuration and its backup; keep sdkconfig.defaults* tracked
+sdkconfig
+sdkconfig.old
+
+# CMake/Ninja files generated outside a build directory
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+build.ninja
+.ninja_deps
+.ninja_log
+
+# Board Manager generated consumer component; board source YAML stays tracked
+components/gen_bmgr_codes/
+
+# Migration tooling bytecode caches
+tools/guition/**/__pycache__/
+tests/
+tools/
+AGENTS.md
+docs/
+.vscode/
+
+dependencies.lock
+sdkconfig
+sdkconfig.old
