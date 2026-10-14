@@ -5,13 +5,17 @@ Board Manager. It does not draw a GUI or initialize audio/SD. Shared SPI
 boards acquire resources per device; do not replace this sequence with a
 bulk `esp_board_manager_init()` call.
 
-The manifest uses this board component through `override_path: "../../.."`.
-Activate ESP-IDF 6.1 in this example directory and run:
+The manifest uses `guition-jc/guition_boards` 0.1.2 through
+`override_path: "../../.."`. Replace `/path/to/esp-idf` with your ESP-IDF 6.1
+installation directory and run from this example directory:
 
 ```bash
+. /path/to/esp-idf/export.sh
 idf.py set-target esp32p4
 idf.py bmgr -b jc8012p4a1
+idf.py menuconfig
 idf.py build
+idf.py -p <PORT> flash monitor
 ```
 
 JC8012P4A1C also needs the published `guition-jc/esp_lcd_touch_gsl3680` 0.1.0.

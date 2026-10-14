@@ -2,5 +2,5 @@
 board: esp32_8048s070
 chip: esp32s3
 version: 1.0.0
-description: ESP32-8048S070 RGB display (hardware unverified)
-manufacturer: Guition
+description: "ESP32-8048S070 RGB display (hardware unverified)"
+manufacturer: "Guition"

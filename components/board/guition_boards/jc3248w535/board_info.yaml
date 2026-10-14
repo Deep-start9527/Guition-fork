@@ -2,5 +2,5 @@
 board: jc3248w535
 chip: esp32s3
 version: 1.0.0
-description: JC3248W535 QSPI display (hardware unverified)
-manufacturer: Guition
+description: "JC3248W535 QSPI display (hardware unverified)"
+manufacturer: "Guition"

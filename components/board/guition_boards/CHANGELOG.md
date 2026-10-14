@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.2
+
+- Add the `jc8048f543` ESP32-S31 board definition with the same peripheral, device and SDK configuration as `jc8048f550` for a different physical screen size.
+- Include all three ESP32-S31 boards in the board catalog.
+- Standardize board YAML indentation, list spacing, inline scalar arrays, hexadecimal I2C addresses and double-quoted strings.
+- Preserve configuration values, data types, field order and YAML anchors and aliases during formatting.
+- Document YAML formatting conventions and the 24 board configurations, including ESP32-S31.
+- Synchronize the component version, README installation command and example dependency at `0.1.2`.
+
 ## 0.1.1
 
 - Add target esp32s31

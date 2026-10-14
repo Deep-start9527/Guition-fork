@@ -2,5 +2,5 @@
 board: jc3636k518
 chip: esp32s3
 version: 1.0.0
-description: JC3636K518 QSPI display (hardware unverified)
-manufacturer: Guition
+description: "JC3636K518 QSPI display (hardware unverified)"
+manufacturer: "Guition"
