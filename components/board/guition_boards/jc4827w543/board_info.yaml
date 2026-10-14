@@ -2,5 +2,5 @@
 board: jc4827w543
 chip: esp32s3
 version: 1.0.0
-description: JC4827W543 QSPI display (hardware unverified)
-manufacturer: Guition
+description: "JC4827W543 QSPI display (hardware unverified)"
+manufacturer: "Guition"

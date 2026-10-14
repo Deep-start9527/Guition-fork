@@ -2,5 +2,5 @@
 board: jc2432w328
 chip: esp32
 version: 1.0.0
-description: JC2432W328 SPI display (hardware unverified)
-manufacturer: Guition
+description: "JC2432W328 SPI display (hardware unverified)"
+manufacturer: "Guition"

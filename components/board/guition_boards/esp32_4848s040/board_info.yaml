@@ -2,5 +2,5 @@
 board: esp32_4848s040
 chip: esp32s3
 version: 1.0.0
-description: ESP32-4848S040 RGB_3WIRE_SPI display (hardware unverified)
-manufacturer: Guition
+description: "ESP32-4848S040 RGB_3WIRE_SPI display (hardware unverified)"
+manufacturer: "Guition"

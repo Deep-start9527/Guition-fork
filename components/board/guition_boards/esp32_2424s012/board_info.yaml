@@ -2,5 +2,5 @@
 board: esp32_2424s012
 chip: esp32c3
 version: 1.0.0
-description: ESP32-2424S012 SPI display (hardware unverified)
-manufacturer: Guition
+description: "ESP32-2424S012 SPI display (hardware unverified)"
+manufacturer: "Guition"

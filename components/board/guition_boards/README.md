@@ -15,11 +15,13 @@ Guition 开发板的 ESP Board Manager 板级支持组件，组件名为 `guitio
 - `board_devices.yaml`：设备、驱动依赖及初始化参数。
 - `sdkconfig.defaults.board`：板级默认配置。
 
+板级 YAML 使用两空格缩进，列表项相对所属字段缩进一级，设备和外设条目之间保留空行。标量数组采用行内形式（如 `[FL, FR]`），I2C 地址采用十六进制（如 `0x30`、`[0xBA, 0x28]`）；描述、厂商、挂载路径和需要引号的字符串使用双引号。
+
 ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/esp-board-manager/blob/main/README.md)。本文的板型列表组织方式参考 [ESP Boards](https://github.com/espressif/esp-board-manager/blob/main/esp_boards/README.md)。
 
 ## 兼容性
 
-当前版本为 `0.1.0`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
+当前版本为 `0.1.2`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
 
 | 依赖 | 版本 |
 | --- | --- |
@@ -27,7 +29,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 | `espressif/esp_board_manager` | `0.7.3~1` |
 | `espressif/esp_lcd_touch` | `1.2.1` |
 
-支持目标为 ESP32、ESP32-C3、ESP32-S3 和 ESP32-P4，共 21 个板型配置。目录中保留的 `jc8048f550`、`jc1060f570c` 为历史 ESP32-S31 配置，不在当前版本的编译支持范围内。
+组件清单声明的目标为 ESP32、ESP32-C3、ESP32-S3、ESP32-P4 和 ESP32-S31，共 24 个板型配置。ESP32-S31 板型需要所用 ESP-IDF 环境提供 `esp32s31` 目标支持。
 
 ## 支持的开发板
 
@@ -43,6 +45,16 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 | [jc8012p4a1](jc8012p4a1/) | JD9365（MIPI DSI） | 800×1280 | GSL3680 | SDMMC | ES8311（DAC + ADC） |
 
 `jc1060p470` 和 `jc1060p470_i_w_y` 分别对应无外壳与带外壳版本。JC8012P4A1 可在 menuconfig 的 `Guition JC8012P4A1 display` 中选择 LCD V1 / V2，默认 V2。JC4880P443 的触摸列以实际 GT911 工厂函数为准；其 YAML 芯片名与坐标范围仍需结合硬件核对，详见[板级配置](jc4880p443/board_devices.yaml)。
+
+### ESP32-S31
+
+| 板型标识 | LCD（接口） | 分辨率 | 触摸 | SD 卡 | 音频 |
+| --- | --- | --- | --- | --- | --- |
+| [jc8048f543](jc8048f543/) | 通用 RGB 面板（RGB） | 800×480 | GT911 | SDMMC | ES8389（DAC + ADC） |
+| [jc8048f550](jc8048f550/) | 通用 RGB 面板（RGB） | 800×480 | GT911 | SDMMC | ES8389（DAC + ADC） |
+| [jc1060f570c](jc1060f570c/) | 通用 RGB 面板（RGB） | 1024×600 | GT911 | SDMMC | ES8389（DAC + ADC） |
+
+`jc8048f543` 与 `jc8048f550` 的屏幕物理尺寸不同，分辨率、引脚、显示时序、触摸、音频、SD 卡和板级默认配置相同。
 
 ### ESP32-S3
 
@@ -81,14 +93,15 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 将本组件复制到应用的 `components/guition_boards`。组件发布到组件中心后，也可通过以下命令添加：
 
 ```bash
-idf.py add-dependency "guition-jc/guition_boards==0.1.0"
+idf.py add-dependency "guition-jc/guition_boards==0.1.2"
 ```
 
 本组件已声明 ESP Board Manager 依赖；各板型所需的驱动依赖由 ESP Board Manager 按所选配置生成。
 
-可直接使用本组件的 [board_init 示例](examples/board_init/README.md)。在已激活的 ESP-IDF 6.1 环境中执行：
+可直接使用本组件的 [board_init 示例](examples/board_init/README.md)。将 `/path/to/esp-idf` 替换为本地 ESP-IDF 6.1 安装目录后执行：
 
 ```bash
+. /path/to/esp-idf/export.sh
 cd examples/board_init
 idf.py set-target esp32p4
 idf.py bmgr -b jc8012p4a1

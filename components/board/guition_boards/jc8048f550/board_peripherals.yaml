@@ -1,4 +1,4 @@
-# Peripherals Configuration for ESP32-S31-Korvo-1
+# Peripherals Configuration for JC8048F550 / JC8048F543
 peripherals:
   # Shared control bus for ES8389. Schematic nets: GPIO0 -> CDATA, GPIO1 -> CCLK.
   - name: i2c_master
@@ -51,7 +51,7 @@ peripherals:
       pin: 42
       mode: GPIO_MODE_OUTPUT
       default_level: 0
-  
+
   # Backlight Control
   - name: ledc_backlight
     type: ledc
@@ -59,40 +59,8 @@ peripherals:
     config:
       gpio_num: 17
       speed_mode: LEDC_LOW_SPEED_MODE
+      freq_hz: 20000
+      duty_resolution: "LEDC_TIMER_10_BIT"
       channel: 1
       timer_sel: 1
       duty: 0
-
-  # SD card power/control. S31 BSP drives GPIO39 low to enable the SD path.
-  # - name: gpio_sd_power
-  #   type: gpio
-  #   role: io
-  #   config:
-  #     pin: 39
-  #     mode: GPIO_MODE_OUTPUT
-  #     default_level: 1
-
-  # Camera XCLK. Keep a 20 MHz clock on GPIO55 before DVP initialization.
-  # - name: ledc_camera_xclk
-  #   type: ledc
-  #   config:
-  #     gpio_num: 55
-  #     channel: LEDC_CHANNEL_0
-  #     timer_sel: LEDC_TIMER_1
-  #     freq_hz: 20000000
-  #     duty: 0
-  #     duty_resolution: LEDC_TIMER_1_BIT
-  #     speed_mode: LEDC_LOW_SPEED_MODE
-  #     output_invert: false
-  #     sleep_mode: LEDC_SLEEP_MODE_NO_ALIVE_NO_PD
-
-  # ADC button ladder. Schematic net: ADC_KEY=GPIO42, ESP32-S31 ADC1 channel 0.
-  # - name: adc_oneshot
-  #   type: adc
-  #   role: oneshot
-  #   config:
-  #     unit_id: ADC_UNIT_1
-  #     clk_src: ADC_DIGI_CLK_SRC_DEFAULT
-  #     channel_id: 0
-  #     atten: ADC_ATTEN_DB_0
-  #     bit_width: SOC_ADC_DIGI_MAX_BITWIDTH

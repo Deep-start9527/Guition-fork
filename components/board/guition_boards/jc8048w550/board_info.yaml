@@ -2,5 +2,5 @@
 board: jc8048w550
 chip: esp32s3
 version: 1.0.0
-description: JC8048W550 RGB display (hardware unverified)
-manufacturer: Guition
+description: "JC8048W550 RGB display (hardware unverified)"
+manufacturer: "Guition"
