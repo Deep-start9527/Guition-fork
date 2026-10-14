@@ -21,7 +21,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 
 ## 兼容性
 
-当前版本为 `0.1.2`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
+当前版本为 `0.1.3`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
 
 | 依赖 | 版本 |
 | --- | --- |
@@ -93,7 +93,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 将本组件复制到应用的 `components/guition_boards`。组件发布到组件中心后，也可通过以下命令添加：
 
 ```bash
-idf.py add-dependency "guition-jc/guition_boards==0.1.2"
+idf.py add-dependency "guition-jc/guition_boards==0.1.3"
 ```
 
 本组件已声明 ESP Board Manager 依赖；各板型所需的驱动依赖由 ESP Board Manager 按所选配置生成。
@@ -111,6 +111,8 @@ idf.py -p <PORT> flash monitor
 ```
 
 示例通过相对 `override_path` 引用本组件，初始化 LCD、触摸和背光，不绘制界面，也不初始化音频或 SD 卡。复制示例到其他位置时，需更新 `main/idf_component.yml` 中的本地组件路径。
+
+[display_lv_demo_widgets 示例](../../../example/display/display_lv_demo_widgets/README.md) 演示 LVGL Widgets 界面，与本组件一同发布到组件中心。
 
 使用其他开发板时，将目标芯片和板型标识替换为对应值；切换板型后重新生成 BMGR 配置。切换目标芯片时建议使用独立工程目录，避免沿用旧的生成配置。
 

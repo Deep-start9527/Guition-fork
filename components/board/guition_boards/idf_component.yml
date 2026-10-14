@@ -1,9 +1,11 @@
-version: "0.1.2"
+version: "0.1.3"
 license: "MIT"
-url: "https://github.com/Deep-start9527/Guition"
-repository: "https://github.com/Deep-start9527/Guition.git"
+url: "https://github.com/Guition-JC/Guition"
+repository: "https://github.com/Guition-JC/Guition.git"
 repository_info:
-  path: "components/boards/guition_boards"
+  path: "components/board/guition_boards"
+examples:
+  - path: "../../../example/display/display_lv_demo_widgets"
 description: "Guition board definitions and touch adapters for ESP Board Manager"
 targets:
   - esp32
@@ -25,6 +27,9 @@ tags:
   - esp_board_manager
 files:
   exclude:
+    - "**/docs/**/*"
+    - "**/tools/**/*"
+    - "**/.vscode/**/*"
     - "**/build-*/**/*"
     - "**/gen_bmgr_codes/**/*"
     - "**/*.log"
