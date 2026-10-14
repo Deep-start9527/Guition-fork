@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1
+
+- Add target esp32s31
+
 ## 0.1.0 package refresh (2026-10-13)
 
 - Rename the component directory to `guition_boards` under `components/boards`.
