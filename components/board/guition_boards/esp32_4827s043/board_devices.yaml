@@ -23,7 +23,8 @@ devices:
         in_color_format: LCD_COLOR_FMT_RGB565
         out_color_format: LCD_COLOR_FMT_RGB565
         num_fbs: 2
-        bounce_buffer_size_px: 4800
+        # Eight lines divide the 272-line frame into complete DMA bounce blocks.
+        bounce_buffer_size_px: 3840
         dma_burst_size: 64
         data_gpio_nums: [8, 3, 46, 9, 1, 5, 6, 7, 15, 16, 4, 45, 48, 47, 21, 14]
         timings:

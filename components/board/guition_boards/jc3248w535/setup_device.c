@@ -6,7 +6,16 @@
 #include "esp_board_manager.h"
 #include "../include/guition_touch.h"
 #include "esp_lcd_axs15231b.h"
+#include "esp_lcd_panel_interface.h"
 #include "lcd_init_commands.h"
+
+static esp_err_t (*axs15231b_disp_off)(esp_lcd_panel_t *panel, bool off);
+
+static esp_err_t panel_disp_on_off(esp_lcd_panel_t *panel, bool on)
+{
+    // AXS15231B 2.1.0 uses the legacy "off" argument on the modern callback.
+    return axs15231b_disp_off(panel, !on);
+}
 
 esp_err_t lcd_panel_factory_entry_t(esp_lcd_panel_io_handle_t io,
                                       const esp_lcd_panel_dev_config_t *config,
@@ -20,7 +29,12 @@ esp_err_t lcd_panel_factory_entry_t(esp_lcd_panel_io_handle_t io,
     };
     esp_lcd_panel_dev_config_t panel = *config;
     panel.vendor_config = &vendor;
-    return esp_lcd_new_panel_axs15231b(io, &panel, out);
+    esp_err_t ret = esp_lcd_new_panel_axs15231b(io, &panel, out);
+    if (ret == ESP_OK) {
+        axs15231b_disp_off = (*out)->disp_on_off;
+        (*out)->disp_on_off = panel_disp_on_off;
+    }
+    return ret;
 }
 
 #if CONFIG_GUITION_TOUCH_CAPACITIVE

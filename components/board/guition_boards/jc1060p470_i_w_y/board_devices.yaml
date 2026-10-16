@@ -40,7 +40,7 @@ devices:
     dependencies:
       espressif/esp_lcd_jd9165: ^2.0.2
     config:
-      reset_gpio_num: 27
+      reset_gpio_num: 0
       rgb_ele_order: LCD_RGB_ELEMENT_ORDER_RGB
       data_endian: LCD_RGB_DATA_ENDIAN_BIG
       bits_per_pixel: 24

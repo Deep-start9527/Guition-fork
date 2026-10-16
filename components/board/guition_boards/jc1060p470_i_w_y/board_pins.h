@@ -21,7 +21,7 @@
 #define WIFI_SDIO_D3_PIN            GPIO_NUM_17
 #define WIFI_ESP32C6_RESET_PIN      GPIO_NUM_54         // ESP32-C6芯片复位
 #define WIFI_ESP32C6_IO2_PIN        GPIO_NUM_6          // 连接至ESP32-C6 的GPIO2，可用于ESP32-C6进入休眠时唤醒源
-#define SDMMC_LDO_ID                3
+#define SDMMC_LDO_ID                4
 #define SD_SDMMC_SCK_PIN            GPIO_NUM_43
 #define SD_SDMMC_CMD_PIN            GPIO_NUM_44
 #define SD_SDMMC_D0_PIN             GPIO_NUM_39

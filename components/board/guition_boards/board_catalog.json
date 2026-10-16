@@ -172,6 +172,17 @@
       ]
     },
     {
+      "model": "JC3636F118",
+      "board": "jc3636f118",
+      "target": "esp32s31",
+      "capacitive": true,
+      "resistive": false,
+      "default": "capacitive",
+      "drivers": [
+        "CST816S"
+      ]
+    },
+    {
       "model": "JC3636K518",
       "board": "jc3636k518",
       "target": "esp32s3",

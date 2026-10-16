@@ -21,7 +21,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 
 ## 兼容性
 
-当前版本为 `0.1.3`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
+当前版本为 `0.1.4`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
 
 | 依赖 | 版本 |
 | --- | --- |
@@ -52,6 +52,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 | --- | --- | --- | --- | --- | --- |
 | [jc8048f543](jc8048f543/) | 通用 RGB 面板（RGB） | 800×480 | GT911 | SDMMC | ES8389（DAC + ADC） |
 | [jc8048f550](jc8048f550/) | 通用 RGB 面板（RGB） | 800×480 | GT911 | SDMMC | ES8389（DAC + ADC） |
+| [jc3636f118](jc3636f118/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC | — |
 | [jc1060f570c](jc1060f570c/) | 通用 RGB 面板（RGB） | 1024×600 | GT911 | SDMMC | ES8389（DAC + ADC） |
 
 `jc8048f543` 与 `jc8048f550` 的屏幕物理尺寸不同，分辨率、引脚、显示时序、触摸、音频、SD 卡和板级默认配置相同。
@@ -93,7 +94,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 将本组件复制到应用的 `components/guition_boards`。组件发布到组件中心后，也可通过以下命令添加：
 
 ```bash
-idf.py add-dependency "guition-jc/guition_boards==0.1.3"
+idf.py add-dependency "guition-jc/guition_boards==0.1.4"
 ```
 
 本组件已声明 ESP Board Manager 依赖；各板型所需的驱动依赖由 ESP Board Manager 按所选配置生成。
@@ -112,8 +113,6 @@ idf.py -p <PORT> flash monitor
 
 示例通过相对 `override_path` 引用本组件，初始化 LCD、触摸和背光，不绘制界面，也不初始化音频或 SD 卡。复制示例到其他位置时，需更新 `main/idf_component.yml` 中的本地组件路径。
 
-[display_lv_demo_widgets 示例](../../../example/display/display_lv_demo_widgets/README.md) 演示 LVGL Widgets 界面，与本组件一同发布到组件中心。
-
 使用其他开发板时，将目标芯片和板型标识替换为对应值；切换板型后重新生成 BMGR 配置。切换目标芯片时建议使用独立工程目录，避免沿用旧的生成配置。
 
 ## 配置与使用说明
@@ -121,7 +120,8 @@ idf.py -p <PORT> flash monitor
 - **触摸选择**：ESP32、ESP32-C3 和 ESP32-S3 板型在 menuconfig 的 `Guition touch` 中选择电容、电阻或无触摸，选项由板型能力决定。ESP32-P4 使用各板原生触摸配置。
 - **设备初始化**：按名称调用 `esp_board_manager_init_device_by_name()` 初始化 `display_lcd`、`lcd_touch` 和 `lcd_brightness`，具体顺序见示例。多触摸变体板型不要使用 `esp_board_manager_init()` 批量初始化全部外设，以免启用未选择的总线。
 - **显示缓冲**：本组件的 ESP32 / ESP32-C3 板型没有 PSRAM，应用需使用内部 RAM 缓冲。JC3248W535 的 AXS15231B 驱动要求整帧提交，应用需配置相应的刷新方式。
-- **SD 卡**：支持的板型通过 `GUITION_SD_ENABLED` 启用，默认关闭。使用 [guition_sd.h](include/guition_sd.h) 的接口，在 LCD / 触摸初始化前调用 `guition_sd_before_display()`，之后通过 `guition_sd_mount()` / `guition_sd_unmount()` 管理挂载。挂载点为 `/sdcard`，默认 20 MHz，不自动格式化。不要同时通过 BMGR 初始化 `fs_sdcard`；共享 SPI 总线重新挂载时需暂停触摸轮询。
+- **SD 卡**：支持的板型通过 `GUITION_SD_ENABLED` 启用，默认关闭。通过 ESP Board Manager 的 `fs_sdcard` 设备管理挂载、卸载及卡句柄；参数由板级设备和外设配置提供。共享 SPI 的板型需要应用协调片选状态、LCD / 触摸初始化顺序及挂载期间的触摸轮询。
+- **JC4827W543 电阻触摸版 SD 卡**：使用 FAT32 文件系统。
 - **P4 配置**：旧版芯片需在 menuconfig 中选择匹配的芯片版本；应用需提供与 Flash 容量匹配的分区表，示例已附带分区表。当前 SD 电源配置保留 LDO4，需按实际硬件确认。
 
 触摸公共接口见 [guition_touch.h](include/guition_touch.h)，板型与触摸变体索引见 [board_catalog.json](board_catalog.json)。
