@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.4
+
+- Add the `jc3636f118` ESP32-S31 board definition with a 360×360 ST77916 QSPI display, optional CST816S capacitive touch, PWM backlight and 4-bit SDMMC, including its touch profile and board catalog entry.
+- Enable JD9165 LCD V2 on `jc1060p470_i_w_y` with dedicated initialization commands and a horizontal back porch of 136; select V2 by default while retaining V1 support.
+- Correct the `jc1060p470_i_w_y` LCD reset pin to GPIO0 and the SDMMC power LDO definition to LDO4.
+- Fix the AXS15231B 2.1.0 display on/off callback polarity on `jc3248w535` and mirror the resistive touch Y axis on `jc4827w543`.
+- Set the `esp32_4827s043` RGB bounce buffer to 3840 pixels (eight lines) so DMA blocks divide the 272-line frame evenly, and configure three frame buffers on `jc1060f570c`.
+- Enable XMC flash bootloader support and brownout reset handling on `esp32_2424s012`; default to a 240 MHz CPU on `esp32_2432s024`, `esp32_2432s028`, `esp32_2432s032`, `esp32_3248s035` and `jc2432w328`.
+- **Breaking change:** Remove `guition_sd.h` and the `guition_sd_*` APIs. Applications must use the ESP Board Manager `fs_sdcard` device for SD card lifecycle management and coordinate chip selects, display/touch initialization and touch polling when sharing SPI buses.
+- Document the FAT32 requirement for SD cards on the resistive-touch `jc4827w543` variant.
+
 ## 0.1.3
 
 - Add the `display_lv_demo_widgets` example with LVGL Widgets, Board Manager display initialization and touch input.

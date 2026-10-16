@@ -5,8 +5,10 @@
 #include "esp_board_manager_includes.h"
 #include "esp_lv_adapter.h"
 #include "guition_touch.h"
-#include "guition_sd.h"
+#include "sd_board.h"
 #include "display.h"
+#include "display_rotation.h"
+#include "display_buffers.h"
 
 static const char *TAG = "Display";
 static lv_display_t *s_disp;
@@ -18,7 +20,7 @@ esp_err_t display_init(void)
         return ESP_ERR_INVALID_STATE;
     }
 #if CONFIG_GUITION_SD_ENABLED
-    esp_err_t sd_ret = guition_sd_before_display();
+    esp_err_t sd_ret = sd_board_before_display();
     if (sd_ret != ESP_OK) ESP_LOGW(TAG, "SD pre-initialization: %s", esp_err_to_name(sd_ret));
 #endif
     bool skip_touch = false;
@@ -82,7 +84,7 @@ esp_err_t display_init(void)
             // complete frame; IDF splits this transfer while keeping CS active.
             display_config = ESP_LV_ADAPTER_DISPLAY_SPI_WITH_PSRAM_TE_HIGH_PERFORMANCE_CONFIG(
                 lcd->panel_handle, lcd->io_handle, lcd_cfg->lcd_width, lcd_cfg->lcd_height,
-                ESP_LV_ADAPTER_ROTATE_90, 38, 40000000, 4, 16);
+                CONFIG_DEMO_LCD_ROTATION_DEGREES, 38, 40000000, 4, 16);
             // ASYNC_FULL rotates into a persistent full-frame staging buffer.
             // Disable adapter row submissions: each would restart AXS RAMWR.
             display_config.te_sync.bounce_buffer_enabled = false;
@@ -95,7 +97,7 @@ esp_err_t display_init(void)
                 lcd->panel_handle, lcd->io_handle, lcd_cfg->lcd_width, lcd_cfg->lcd_height, ESP_LV_ADAPTER_ROTATE_0);
         }
 #else
-        // Adapter owns a 10-line DMA buffer until the SPI completion callback.
+        // Draw-buffer tuning is applied after selecting the display interface.
         display_config = ESP_LV_ADAPTER_DISPLAY_SPI_WITHOUT_PSRAM_DEFAULT_CONFIG(
             lcd->panel_handle, lcd->io_handle, lcd_cfg->lcd_width, lcd_cfg->lcd_height, ESP_LV_ADAPTER_ROTATE_0);
 #endif
@@ -113,6 +115,11 @@ esp_err_t display_init(void)
         goto fail;
     }
 
+    ret = demo_display_rotation_configure(lcd_cfg, &display_config);
+    if (ret != ESP_OK) goto fail;
+    ret = demo_display_buffers_configure(lcd_cfg, &display_config);
+    if (ret != ESP_OK) goto fail;
+
     esp_lv_adapter_config_t adapter_config = ESP_LV_ADAPTER_DEFAULT_CONFIG();
     adapter_config.stack_in_psram = false;
     ret = esp_lv_adapter_init(&adapter_config);
@@ -123,10 +130,13 @@ esp_err_t display_init(void)
         ret = ESP_ERR_NO_MEM;
         goto fail;
     }
+    ret = demo_display_rotation_attach(s_disp);
+    if (ret != ESP_OK) goto fail;
     if (touch) {
         esp_lv_adapter_touch_config_t touch_config = {
             .disp = s_disp, .handle = touch, .scale = { .x = 1.0f, .y = 1.0f },
         };
+        demo_display_rotation_touch(&touch_config);
         s_touch_indev = esp_lv_adapter_register_touch(&touch_config);
         if (!s_touch_indev) {
             ret = ESP_ERR_NO_MEM;
@@ -154,6 +164,7 @@ fail:
     }
     s_disp = NULL;
     s_touch_indev = NULL;
+    demo_display_rotation_cleanup();
 #if CONFIG_GUITION_BOARD_TOUCH_ADAPTER
     esp_err_t pending_cleanup = guition_touch_bmgr_recover();
     if (pending_cleanup != ESP_OK) {

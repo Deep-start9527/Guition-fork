@@ -14,4 +14,46 @@ idf.py -p PORT flash monitor
 
 `IDF_EXTENSION_ALLOW_UNTRUSTED=1` 用于加载 ESP Board Manager 的 `bmgr` 命令扩展。将 `PORT` 替换为实际串口。`idf.py bmgr -l` 可列出支持的开发板；使用其他板型时，选择对应的芯片目标和开发板名称。
 
+`jc2432w328` 的触摸类型在 `idf.py menuconfig` 的 `Component config → Guition touch → Touch variant` 中选择：`No touch`（默认）、`Capacitive touch`（CST820）或 `Resistive touch (XPT2046)`。选择须与实际硬件一致；保存配置后执行 `idf.py reconfigure` 和 `idf.py build`，组件管理器会按触摸类型解析对应驱动依赖。
+
+显示旋转在 `idf.py menuconfig → Demo display` 中配置，支持 0°、90°、180°、270°。`Display rotation method` 选择硬件或软件方式，`Display rotation angle` 选择角度；角度相对于板级 LCD 配置，90°/270° 交换逻辑宽高，触摸坐标同步转换。
+
+普通 SPI 屏默认使用 20 行局部绘图缓冲和双缓冲，使绘制下一条带与上一条带传输重叠，减少刷新间隙。`Demo display` 中的 `SPI partial draw buffer lines` 可调整为 4～40 行，`SPI double draw buffers` 可关闭以节省内部 RAM；软件旋转还需要一块同尺寸的 DMA 条带缓冲。这些绘图缓冲与 RGB/MIPI 的板级 `num_fbs` 不同。JC3248W535 保留 GPIO38 TE 同步整帧传输，不受这两个选项影响。未接入 TE 的屏幕写入与扫描不同步，双绘图缓冲不能保证消除撕裂；较大条带的实际效果和可用内存需结合硬件验证。
+
+- ESP32、ESP32-C3 的 240×240、240×320 板型，以及 JC3636 的 360×360 板型，可选择 LCD 控制器硬件旋转或软件旋转。
+- 任一边超过 360 像素的屏幕，90°/270° 使用软件旋转。SPI/QSPI 和 MIPI 板型可先选择 `Display rotation angle → 180 degrees`，再选择 `Display rotation method → Hardware (LCD controller)`，通过 LCD 镜像命令实现硬件 180°，触摸坐标同步转换。此路径保持板级默认刷新模式，不需要为软件旋转增加帧缓冲。
+- 当前普通 RGB 驱动的镜像操作属于 CPU 像素处理，RGB+3-wire SPI 板型也未启用命令镜像，因此这些板型仍使用软件旋转。RGB/MIPI 软件旋转使用 Adapter 的帧缓冲旋转；普通 SPI 软件旋转使用 Adapter 绘图回调和额外的内部 DMA 条带缓冲。硬件镜像调用失败时显示初始化会返回错误。
+- JC3248W535 的 AXS15231B 使用异步 TE 软件旋转，默认 90°；其他板型默认 0°。RGB/MIPI 软件旋转需要板级 LCD 至少提供两个帧缓冲，SPI 软件旋转使用 RGB565。
+
+RGB/MIPI 板型可在 `Demo display → RGB/MIPI single frame buffer (requires board num_fbs = 1)` 选择单帧局部刷新。单 buffer 禁止非零角度的软件旋转，仅支持 0° 无旋转或硬件旋转，显示可能出现撕裂。该选项不会修改板级内存分配；节省 PSRAM 时须将 board 的 `num_fbs` 设为 1 并重新执行 `idf.py bmgr -b <board>`。单帧模式仅在板级实际提供一帧且无需软件旋转时自动启用；板级提供两帧或三帧时，即使保存了单帧选项也会忽略该选项，保留多帧防撕裂模式；软件旋转或其他刷新模式所需帧数不足时，初始化会报告配置错误并停止，不注册不兼容的显示。
+
+RGB/MIPI 板型选择软件旋转及非零角度后，`Demo display → RGB/MIPI software rotation refresh mode` 提供以下模式：
+
+| 刷新模式 | Adapter 模式 | board `num_fbs` 要求 |
+| --- | --- | --- |
+| 两帧、局部刷新（默认） | `DOUBLE_PARTIAL` | 2 |
+| 三帧、局部刷新 | `TRIPLE_PARTIAL` | 3 |
+| 两帧、整屏刷新 | `DOUBLE_FULL` | **3**，非零旋转额外需要一帧 |
+| 三帧、整屏刷新 | `TRIPLE_FULL` | 3 |
+
+**menuconfig 的刷新模式不会自动修改 board 的 buffer 数量。** 必须在所选板型的 `board_devices.yaml` 中，将 `display_lcd` 设备的 `config.rgb_panel_config.num_fbs`（RGB，包括 RGB+3-wire SPI）或 `config.dpi_config.num_fbs`（MIPI）设为上表要求，再执行 `idf.py bmgr -b <board>`、`idf.py reconfigure` 和 `idf.py build`。帧缓冲不足会导致显示注册失败；更多帧缓冲会增加内存占用，整屏刷新会增加每次重绘的数据量。
+
+`jc1060f570c` 的 LCD 默认配置为 `num_fbs: 3`。减小 `num_fbs` 可以减少帧缓冲占用，增加可用于其他功能的 PSRAM；调整后仍须满足所选刷新模式的最低缓冲数量。使用两帧局部刷新或默认的双缓冲直接刷新时可设为 2；需要三帧的模式不可减为 2。
+
+应修改实际被 Board Manager 使用的板级组件文件；仅修改外部 board 源码不会自动更新组件中心下载的版本。板级源码发布后，工程需更新依赖并重新生成板级配置。SPI/QSPI 的刷新路径以及 0° 时的默认刷新配置不受此选项影响。
+
 依赖解析后由 `dependencies.lock` 锁定版本。需要更新组件时执行 `idf.py update-dependencies`，再执行 `idf.py bmgr -b <board>` 和 `idf.py build`。
+
+Flash 容量由板级配置或 `idf.py menuconfig` 中的 `Serial flasher config → Flash size` 指定，应与实际硬件一致。分区设置使用自定义表且文件名为默认的 `partitions.csv` 时，构建会按该容量自动选择布局：
+
+| Flash 容量 | 分区表 | 应用分区 | SPIFFS 存储分区 |
+| --- | --- | --- | --- |
+| 1MB | `partitions_1mb.csv` | 768KB | 128KB |
+| 2MB | `partitions_2mb.csv` | 1792KB | 128KB |
+| 4MB | `partitions_4mb.csv` | 3MB | 896KB |
+| 8MB | `partitions_8mb.csv` | 5MB | 2944KB |
+| 16MB 及以上 | `partitions.csv` | 9MB | 4MB |
+
+自动选择依据构建配置，不探测硬件容量。更大 Flash 的剩余空间不分配；需要其他布局时，可在 `Partition Table` 中指定其他自定义 CSV 文件名。应用固件仍须小于对应应用分区容量。
+
+`idf.py set-target` 后、选择开发板前，ESP-IDF 默认 Flash 容量可能为 2MB。此时可以继续执行 `idf.py bmgr -b <board>` 或 `idf.py menuconfig`，按实际硬件配置容量。1MB/2MB 分区可用于配置及容量检查，不保证包含全部 LVGL 功能的固件能够装入；应用超出分区时构建会报错。

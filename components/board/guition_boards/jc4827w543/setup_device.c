@@ -57,7 +57,7 @@ static esp_err_t create_resistive(void **out)
             .x_max = 480, .y_max = 272,
             .rst_gpio_num = -1, .int_gpio_num = -1,
             .levels = { .reset = 0, .interrupt = 0 },
-            .flags = { .swap_xy = 0, .mirror_x = 0, .mirror_y = 0 },
+            .flags = { .swap_xy = 0, .mirror_x = 0, .mirror_y = 1 },
         },
         .factory = esp_lcd_touch_new_spi_xpt2046,
     };

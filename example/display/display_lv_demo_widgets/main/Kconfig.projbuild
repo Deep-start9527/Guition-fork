@@ -1,0 +1,126 @@
+menu "Demo display"
+
+config DEMO_SPI_DRAW_BUFFER_LINES
+    int "SPI partial draw buffer lines (non-TE displays)"
+    depends on ESP_BOARD_DEV_DISPLAY_LCD_SUB_SPI_SUPPORT && !ESP_BOARD_JC3248W535
+    range 4 40
+    default 20
+    help
+        Larger strips reduce flush overhead but use more internal RAM.
+        This does not synchronize writes with panel scanning.
+
+config DEMO_SPI_DOUBLE_DRAW_BUFFER
+    bool "SPI double draw buffers (non-TE displays)"
+    depends on ESP_BOARD_DEV_DISPLAY_LCD_SUB_SPI_SUPPORT && !ESP_BOARD_JC3248W535
+    default y
+    help
+        Render the next strip while the previous strip is transferred.
+        Uses two internal RAM draw buffers; software rotation additionally
+        needs one DMA strip buffer. Disable to reduce memory use.
+        These are LVGL draw buffers, not RGB/MIPI panel num_fbs.
+
+config DEMO_LCD_HARDWARE_ROTATION_SUPPORTED
+    bool
+    default y if (IDF_TARGET_ESP32 || IDF_TARGET_ESP32C3) && (ESP_BOARD_ESP32_2424S012 || ESP_BOARD_ESP32_2432S024 || ESP_BOARD_ESP32_2432S028 || ESP_BOARD_ESP32_2432S032 || ESP_BOARD_JC2432W328)
+    default y if ESP_BOARD_JC3636K518 || ESP_BOARD_JC3636K718 || ESP_BOARD_JC3636W518 || ESP_BOARD_JC3636F118
+
+config DEMO_LCD_HARDWARE_180_SUPPORTED
+    bool
+    default y if ESP_BOARD_DEV_DISPLAY_LCD_SUB_SPI_SUPPORT || ESP_BOARD_DEV_DISPLAY_LCD_SUB_DSI_SUPPORT
+
+choice DEMO_LCD_ROTATION_ANGLE
+    prompt "Display rotation angle"
+    default DEMO_LCD_ROTATION_90 if ESP_BOARD_JC3248W535
+    default DEMO_LCD_ROTATION_0
+    help
+        Rotation relative to the board's LCD orientation. Touch coordinates
+        follow the same rotation. 90 and 270 degrees exchange logical width
+        and height. Angles follow ESP LVGL Adapter rotation conventions.
+
+config DEMO_LCD_ROTATION_0
+    bool "0 degrees"
+config DEMO_LCD_ROTATION_90
+    bool "90 degrees"
+config DEMO_LCD_ROTATION_180
+    bool "180 degrees"
+config DEMO_LCD_ROTATION_270
+    bool "270 degrees"
+endchoice
+
+config DEMO_LCD_ROTATION_DEGREES
+    int
+    default 90 if DEMO_LCD_ROTATION_90
+    default 180 if DEMO_LCD_ROTATION_180
+    default 270 if DEMO_LCD_ROTATION_270
+    default 0
+
+choice DEMO_LCD_ROTATION_MODE
+    prompt "Display rotation method"
+    default DEMO_LCD_ROTATION_HARDWARE if DEMO_LCD_HARDWARE_ROTATION_SUPPORTED
+    default DEMO_LCD_ROTATION_SOFTWARE
+
+config DEMO_LCD_ROTATION_HARDWARE
+    bool "Hardware (LCD controller)"
+    depends on DEMO_LCD_HARDWARE_ROTATION_SUPPORTED || (DEMO_LCD_ROTATION_180 && DEMO_LCD_HARDWARE_180_SUPPORTED)
+    help
+        Use panel axis swapping and mirroring on supported ESP32, ESP32-C3
+        and JC3636 displays up to 360x360. Larger supported command-driven
+        panels can use hardware mirroring at 180 degrees only. RGB panels
+        using CPU mirror/copy operations require software rotation.
+
+config DEMO_LCD_ROTATION_SOFTWARE
+    bool "Software (LVGL adapter)"
+    help
+        Rotate pixels through the LVGL adapter. Ordinary SPI displays use
+        its draw callback with an additional DMA strip buffer. RGB/MIPI
+        displays use the selected frame buffer and refresh mode.
+
+endchoice
+
+config DEMO_LCD_SINGLE_FRAME_BUFFER
+    bool "RGB/MIPI single frame buffer (requires board num_fbs = 1)"
+    depends on ESP_BOARD_DEV_DISPLAY_LCD_SUB_RGB_SUPPORT || ESP_BOARD_DEV_DISPLAY_LCD_SUB_RGB_3WIRE_SPI_SUPPORT || ESP_BOARD_DEV_DISPLAY_LCD_SUB_DSI_SUPPORT
+    depends on DEMO_LCD_ROTATION_0 || DEMO_LCD_ROTATION_HARDWARE
+    default n
+    help
+        Use one panel frame buffer with a small LVGL draw buffer. Tearing may
+        occur. Supports zero rotation or hardware rotation, not software
+        rotation. Set board num_fbs to 1 and regenerate with bmgr to save PSRAM.
+        This option does not change board allocation and is ignored when the
+        board provides multiple frame buffers. When the board provides only
+        one frame buffer, this mode is selected automatically if compatible.
+
+choice DEMO_LCD_RGB_MIPI_REFRESH
+    prompt "RGB/MIPI software rotation refresh mode"
+    depends on DEMO_LCD_ROTATION_SOFTWARE && !DEMO_LCD_ROTATION_0
+    depends on ESP_BOARD_DEV_DISPLAY_LCD_SUB_RGB_SUPPORT || ESP_BOARD_DEV_DISPLAY_LCD_SUB_RGB_3WIRE_SPI_SUPPORT || ESP_BOARD_DEV_DISPLAY_LCD_SUB_DSI_SUPPORT
+    default DEMO_LCD_REFRESH_DOUBLE_PARTIAL
+    help
+        Configure board_devices.yaml before regenerating the board with bmgr.
+        RGB uses config.rgb_panel_config.num_fbs; MIPI uses
+        config.dpi_config.num_fbs. These options do not change board buffers.
+
+config DEMO_LCD_REFRESH_DOUBLE_PARTIAL
+    bool "Double buffer, partial refresh (board num_fbs = 2)"
+    help
+        Rotate partial draw buffers into two panel frame buffers.
+
+config DEMO_LCD_REFRESH_TRIPLE_PARTIAL
+    bool "Triple buffer, partial refresh (board num_fbs = 3)"
+    help
+        Requires three panel frame buffers for software rotation.
+
+config DEMO_LCD_REFRESH_DOUBLE_FULL
+    bool "Double buffer, full refresh (rotation requires board num_fbs = 3)"
+    help
+        The adapter's DOUBLE_FULL rotation path requires a third panel frame
+        buffer as the drawing/rotation source, despite the mode name.
+
+config DEMO_LCD_REFRESH_TRIPLE_FULL
+    bool "Triple buffer, full refresh (board num_fbs = 3)"
+    help
+        Requires three panel frame buffers and redraws the entire screen.
+
+endchoice
+
+endmenu

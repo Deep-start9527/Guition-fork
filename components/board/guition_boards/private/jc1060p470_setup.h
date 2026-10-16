@@ -20,13 +20,16 @@
 #include "esp_lcd_touch_gt911.h"
 #endif  /* __has_include(<esp_lcd_touch_gt911.h>) */
 
-#if CONFIG_GUITION_JC1060_LCD_V2
-#error "JC1060 LCD V2 is reserved; supply its initialization commands before enabling it"
+#if CONFIG_GUITION_JC1060_LCD_V2 && !CONFIG_ESP_BOARD_JC1060P470_I_W_Y
+#error "LCD V2 is only supported on jc1060p470_i_w_y"
 #endif
 
 static const char *TAG = "P4_FUNCTION_EV_SETUP_DEVICE";
 
 #if defined(HAS_JD9165)
+#if CONFIG_GUITION_JC1060_LCD_V2
+#include "../jc1060p470_i_w_y/lcd_init_v2.h"
+#else
 static const jd9165_lcd_init_cmd_t lcd_cmd[] = {
 
     {0x30, (uint8_t[]){0x00}, 1, 0},
@@ -91,15 +94,20 @@ static const jd9165_lcd_init_cmd_t lcd_cmd[] = {
     {0x11, (uint8_t[]){0x00}, 1, 120},
     {0x29, (uint8_t[]){0x00}, 1, 20},
 };
+#endif
 
 __attribute__((weak)) esp_err_t lcd_dsi_panel_factory_entry_t(esp_lcd_dsi_bus_handle_t dsi_handle, dev_display_lcd_config_t *lcd_cfg, dev_display_lcd_handles_t *lcd_handles)
 {
+    esp_lcd_dpi_panel_config_t dpi_config = lcd_cfg->sub_cfg.dsi.dpi_config;
+#if CONFIG_GUITION_JC1060_LCD_V2
+    dpi_config.video_timing.hsync_back_porch = 136;
+#endif
     jd9165_vendor_config_t vendor_config = {
         .init_cmds = lcd_cmd,
         .init_cmds_size = sizeof(lcd_cmd) / sizeof(jd9165_lcd_init_cmd_t),
         .mipi_config = {
             .dsi_bus = dsi_handle,
-            .dpi_config = &lcd_cfg->sub_cfg.dsi.dpi_config,
+            .dpi_config = &dpi_config,
         },
     };
 
