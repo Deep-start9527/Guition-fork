@@ -5,7 +5,6 @@
 #include "esp_board_manager_includes.h"
 #include "esp_lv_adapter.h"
 #include "guition_touch.h"
-#include "sd_board.h"
 #include "display.h"
 #include "display_rotation.h"
 #include "display_buffers.h"
@@ -19,20 +18,6 @@ esp_err_t display_init(void)
     if (s_disp) {
         return ESP_ERR_INVALID_STATE;
     }
-#if CONFIG_GUITION_SD_ENABLED
-    esp_err_t sd_ret = sd_board_before_display();
-    if (sd_ret != ESP_OK) ESP_LOGW(TAG, "SD pre-initialization: %s", esp_err_to_name(sd_ret));
-#endif
-    bool skip_touch = false;
-#if CONFIG_GUITION_SD_ENABLED
-#if CONFIG_ESP_BOARD_ESP32_4848S040
-    // No CD pin: a failed probe cannot distinguish absence from a card still
-    // in native SD mode. Do not clock the shared LCD control lines in that state.
-    if (sd_ret != ESP_OK) return sd_ret;
-#elif CONFIG_ESP_BOARD_ESP32_4827S043 || CONFIG_ESP_BOARD_JC4827W543
-    skip_touch = sd_ret != ESP_OK;
-#endif
-#endif
     bool lcd_ready = false, touch_ready = false, brightness_ready = false;
     bool adapter_ready = false;
     dev_display_lcd_handles_t *lcd = NULL;
@@ -56,7 +41,7 @@ esp_err_t display_init(void)
 
     // Initialize only selected display devices. BMGR acquires their buses lazily.
     // In particular, CAP/NONE must not initialize a conflicting resistive bus.
-    if (!skip_touch && esp_board_manager_check_name("lcd_touch")) {
+    if (esp_board_manager_check_name("lcd_touch")) {
         ret = esp_board_manager_init_device_by_name("lcd_touch");
         if (ret != ESP_OK) goto fail;
         touch_ready = true;
@@ -192,13 +177,4 @@ bool lvgl_display_lock(int timeout_ms)
 void lvgl_display_unlock(void)
 {
     esp_lv_adapter_unlock();
-}
-
-void display_sd_touch_enable(bool enabled)
-{
-#if CONFIG_GUITION_SD_ENABLED && (CONFIG_ESP_BOARD_ESP32_4827S043 || CONFIG_ESP_BOARD_JC4827W543)
-    if (s_touch_indev) lv_indev_enable(s_touch_indev, enabled);
-#else
-    (void)enabled;
-#endif
 }
