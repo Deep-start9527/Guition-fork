@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 #include "sdkconfig.h"
+#if CONFIG_GUITION_BOARD_NO_PSRAM && CONFIG_SPIRAM
+#error "This board has no PSRAM; disable CONFIG_SPIRAM."
+#endif
 #include "esp_board_manager_includes.h"
 #include "esp_board_entry.h"
 #include "esp_board_manager.h"
-#include "../include/guition_touch.h"
+#include "esp_lcd_touch.h"
 #include "esp_lcd_st77916.h"
 #include "lcd_init_commands.h"
-#include "board_pins.h"
 
 esp_err_t lcd_panel_factory_entry_t(esp_lcd_panel_io_handle_t io,
                                       const esp_lcd_panel_dev_config_t *config,
@@ -25,36 +27,20 @@ esp_err_t lcd_panel_factory_entry_t(esp_lcd_panel_io_handle_t io,
 
 #if CONFIG_GUITION_TOUCH_CAPACITIVE
 #include "esp_lcd_touch_cst816s.h"
-static esp_err_t create_capacitive(void **out)
-{
-    guition_touch_config_t config = {
-        .mode = GUITION_TOUCH_MODE_CAPACITIVE,
-        .bus = GUITION_TOUCH_BUS_I2C,
-        .bus_name = "i2c_touch",
-        .touch = {
-            .x_max = 360, .y_max = 360,
-            .rst_gpio_num = TP_C_RST_PIN, .int_gpio_num = TP_C_INT_PIN,
-            .levels = { .reset = 0, .interrupt = 0 },
-            .flags = { .swap_xy = 0, .mirror_x = 0, .mirror_y = 0 },
-        },
-        .factory = esp_lcd_touch_new_i2c_cst816s,
-    };
-    config.io.i2c = (esp_lcd_panel_io_i2c_config_t)ESP_LCD_TOUCH_IO_I2C_CST816S_CONFIG();
-    config.io.i2c.scl_speed_hz = 400000;
-    return guition_touch_bmgr_create(&config, out);
-}
 #endif
 
-static esp_err_t touch_init(void *board_config, int config_size, void **out)
+esp_err_t lcd_touch_factory_entry_t(esp_lcd_panel_io_handle_t io,
+                                    const esp_lcd_touch_config_t *config,
+                                    esp_lcd_touch_handle_t *out)
 {
-    (void)board_config;
-    (void)config_size;
 #if CONFIG_GUITION_TOUCH_CAPACITIVE
-    return create_capacitive(out);
+    return esp_lcd_touch_new_i2c_cst816s(io, config, out);
 #else
-    const guition_touch_config_t config = { .mode = GUITION_TOUCH_MODE_NONE };
-    return guition_touch_bmgr_create(&config, out);
+    (void)io;
+    (void)config;
+    if (out) {
+        *out = NULL;
+    }
+    return ESP_ERR_NOT_SUPPORTED;
 #endif
 }
-
-CUSTOM_DEVICE_IMPLEMENT(lcd_touch, touch_init, guition_touch_bmgr_destroy);

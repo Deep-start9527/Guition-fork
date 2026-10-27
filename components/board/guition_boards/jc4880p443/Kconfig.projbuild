@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: MIT
+if ESP_BOARD_JC4880P443 && IDF_TARGET_ESP32P4
+
+config GUITION_BOARD_HAS_SD
+    bool
+    default y
+
+config GUITION_SD_ENABLED
+    bool "Enable Guition SD card support"
+    depends on GUITION_BOARD_HAS_SD
+    default n
+    select ESP_BOARD_DEV_FS_FAT_SUPPORT
+
+endif

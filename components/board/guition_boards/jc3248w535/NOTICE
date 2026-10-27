@@ -1,0 +1,7 @@
+JC3248W535/lcd_init_commands.h derives from the local Arduino esp_bsp.c,
+copyright 2021-2024 Espressif Systems (Shanghai) CO LTD, under CC0-1.0.
+That license is reproduced in LICENSES/CC0-1.0.txt.
+Source hashes are recorded in the migration repository's board inventory.
+
+Third-party drivers are declared as registry dependencies and retain their
+own licenses. They are not bundled in this board component.

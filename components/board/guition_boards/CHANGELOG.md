@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.0
+
+- Add the `jc5454f328` ESP32-S31 board definition to the component and board catalog, replacing the example-local copy.
+- Make all 26 board directories independently usable with ESP Board Manager, including board-local Kconfig options, initialization code and required touch support sources.
+- Use native ESP Board Manager I2C touch management for the 18 configurable capacitive-touch boards. Keep touch geometry, GPIOs, orientation and IO settings in YAML; native `i2c_addr` entries use left-shifted I2C addresses.
+- Retain SPI extensions only for the seven resistive-touch boards. Use software SPI on `esp32_2432s028`, reading pins from peripheral YAML, and ESP-IDF hardware SPI on boards sharing the bus with LCD or SD devices.
+- **Breaking change:** Replace the custom touch creation and handle APIs with Board Manager device initialization and `dev_lcd_touch_handles_t.touch_handle`. Applications must select `lcd_touch` for capacitive touch or `lcd_touch_resistive` for resistive touch according to menuconfig, and skip touch initialization in no-touch mode. Configurable touch devices use `init_skip: true` and require explicit initialization.
+- Update both initialization examples for the selected touch device and exclude local tests from component release archives.
+- Use the `guition` Component Registry namespace for board and driver dependencies, retaining the `Guition-JC/Guition` source repository.
+- Add display color selection, configurable MIPI partial draw buffers and optional LVGL refresh statistics to `display_lv_demo_widgets`.
+
 ## 0.1.4
 
 - Add the `jc3636f118` ESP32-S31 board definition with a 360×360 ST77916 QSPI display, optional CST816S capacitive touch, PWM backlight and 4-bit SDMMC, including its touch profile and board catalog entry.

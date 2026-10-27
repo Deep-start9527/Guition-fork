@@ -17,13 +17,6 @@
 #define LCD_BL_PIN                  GPIO_NUM_5
 #define LCD_BL_ON_LEVEL             1
 
-// C 电容触摸 / CST816S
-#define TP_C_I2C_HOST               0
-#define TP_C_SCL_PIN                GPIO_NUM_10       // I2C SCL
-#define TP_C_SDA_PIN                GPIO_NUM_11         // I2C SDA
-#define TP_C_RST_PIN                GPIO_NUM_9
-#define TP_C_INT_PIN                GPIO_NUM_8
-
 // SD卡 / TF卡
 #define SD_SDMMC_SCK_PIN            GPIO_NUM_24
 #define SD_SDMMC_CMD_PIN            GPIO_NUM_25

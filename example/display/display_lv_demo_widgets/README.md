@@ -1,4 +1,4 @@
-使用 ESP-IDF 6.1。板级支持由组件中心的 `guition-jc/guition_boards: "*"` 提供，首次解析依赖时下载满足工程约束的最新版本。
+使用 ESP-IDF 6.1。板级支持由组件中心的 `guition/guition_boards: "*"` 提供，首次解析依赖时下载满足工程约束的最新版本。
 
 以 `jc8012p4a1` 为例，在工程目录执行：
 
@@ -37,6 +37,18 @@ RGB/MIPI 板型选择软件旋转及非零角度后，`Demo display → RGB/MIPI
 | 三帧、整屏刷新 | `TRIPLE_FULL` | 3 |
 
 **menuconfig 的刷新模式不会自动修改 board 的 buffer 数量。** 必须在所选板型的 `board_devices.yaml` 中，将 `display_lcd` 设备的 `config.rgb_panel_config.num_fbs`（RGB，包括 RGB+3-wire SPI）或 `config.dpi_config.num_fbs`（MIPI）设为上表要求，再执行 `idf.py bmgr -b <board>`、`idf.py reconfigure` 和 `idf.py build`。帧缓冲不足会导致显示注册失败；更多帧缓冲会增加内存占用，整屏刷新会增加每次重绘的数据量。
+
+`Demo display → Display color format` 可选择 RGB565 或 RGB888。MIPI DSI 默认 RGB888，其他接口默认 RGB565。MIPI 的输入和输出格式随选项设置，所选色深还须受屏幕驱动和厂家初始化命令支持；此选项不会改写厂家命令。其他接口必须与板级原生色深一致，否则初始化会返回错误。
+
+JC4880P443 保留板级 RGB888 配置，不提供 RGB565 选项，其厂家初始化命令包含固定的像素格式设置。
+
+MIPI 三帧整屏刷新复用 PSRAM 中的面板帧缓冲：一帧供 LVGL 绘图，另外两帧用于旋转输出和显示。例如，480×1280 的 RGB565 每帧为 1,228,800 字节，三帧共约 3.52 MiB；RGB888 时三帧共约 5.27 MiB。ESP32-P4 的适配器在格式和内存对齐满足条件时自动使用 PPA 旋转。选择三帧整屏刷新时，须同时在板级 YAML 设置 `num_fbs: 3`。
+
+比较刷新性能时，应保持相同的编译优化等级、绘图任务数、缓存设置、页面操作和旋转角度。RGB888 的每帧数据量是 RGB565 的 1.5 倍；整屏刷新可减少内部绘图缓冲需求，但不能仅根据 PSRAM 占用判断流畅度。
+
+MIPI 软件旋转选择局部刷新时，`MIPI software rotation partial draw buffer lines` 可设为 20～120，默认 80。适配器为局部刷新分配一块内部 SRAM 绘图缓冲，其容量为物理 LCD 宽度 × 配置行数 × 每像素字节数；该行数不等于 90°/270° 旋转后的逻辑绘图行数。480 像素宽、RGB565、80 行占 76,800 字节，RGB888 占 115,200 字节。内部内存不足时可减小行数，或使用复用 PSRAM 帧缓冲的整屏刷新。
+
+`Log display refresh performance` 默认关闭，可在 menuconfig 中启用。启用后每五秒汇总 LVGL 有绘制内容的刷新次数、刷新率、处理耗时均值/P95/最大值及空闲内部 RAM/PSRAM。`flush_avg` 为刷新回调和同步等待的平均耗时，包含该路径中的旋转、缓存同步和等待；重叠区间仅计一次。`render_other_avg` 为其余处理耗时，包括布局和绘制。统计不包含尚未完成的异步面板扫描，刷新率不是屏幕实际显示帧率。对比刷新模式时应使用相同页面、色深、角度、编译优化等级和滑动操作，不能只根据 PSRAM 容量判断性能。
 
 `jc1060f570c` 的 LCD 默认配置为 `num_fbs: 3`。减小 `num_fbs` 可以减少帧缓冲占用，增加可用于其他功能的 PSRAM；调整后仍须满足所选刷新模式的最低缓冲数量。使用两帧局部刷新或默认的双缓冲直接刷新时可设为 2；需要三帧的模式不可减为 2。
 

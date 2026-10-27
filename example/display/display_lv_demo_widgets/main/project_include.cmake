@@ -1,3 +1,13 @@
+# Keep LVGL, the adapter and the application on the same pixel layout.
+# LVGL 9 also exposes the legacy depth macro, which can have a saved value.
+if(CONFIG_DEMO_LCD_COLOR_RGB888)
+    idf_build_set_property(COMPILE_DEFINITIONS
+        "LV_COLOR_FORMAT_DEFAULT=LV_COLOR_FORMAT_RGB888;LV_COLOR_DEPTH=24" APPEND)
+else()
+    idf_build_set_property(COMPILE_DEFINITIONS
+        "LV_COLOR_FORMAT_DEFAULT=LV_COLOR_FORMAT_RGB565;LV_COLOR_DEPTH=16" APPEND)
+endif()
+
 # main depends on the partition_table component, whose project include resolves
 # PARTITION_CSV_PATH before this file selects the capacity-specific layout.
 if(CONFIG_PARTITION_TABLE_CUSTOM AND CONFIG_PARTITION_TABLE_CUSTOM_FILENAME STREQUAL "partitions.csv")

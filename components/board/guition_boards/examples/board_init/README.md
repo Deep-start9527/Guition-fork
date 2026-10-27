@@ -5,7 +5,7 @@ Board Manager. It does not draw a GUI or initialize audio/SD. Shared SPI
 boards acquire resources per device; do not replace this sequence with a
 bulk `esp_board_manager_init()` call.
 
-The manifest uses `guition-jc/guition_boards` 0.1.2 through
+The manifest uses `guition/guition_boards` 0.2.0 through
 `override_path: "../../.."`. Replace `/path/to/esp-idf` with your ESP-IDF 6.1
 installation directory and run from this example directory:
 
@@ -18,10 +18,10 @@ idf.py build
 idf.py -p <PORT> flash monitor
 ```
 
-JC8012P4A1C also needs the published `guition-jc/esp_lcd_touch_gsl3680` 0.1.0.
+JC8012P4A1C also needs the published `guition/esp_lcd_touch_gsl3680` 0.1.0.
 The touch driver is downloaded from the registry without a local override.
 When copying this example elsewhere, update the board component override to
-its local path, or remove it after `guition-jc/guition_boards` is published.
+its local path, or remove it after `guition/guition_boards` is published.
 
 For another board choose its matching target and BMGR identifier from
 `board_catalog.json` (use `bmgr_board` when supplied). For example,

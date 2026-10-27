@@ -37,10 +37,40 @@ devices:
       espressif/esp_lcd_st77916: ==2.0.2
 
   - name: lcd_touch
-    type: custom
-    chip: guition_touch
-    config: {}
+    type: lcd_touch
+    sub_type: i2c
+    chip: cst816s
+    init_skip: true
+    config:
+      touch_config:
+        x_max: 360
+        y_max: 360
+        rst_gpio_num: 40
+        int_gpio_num: -1
+        levels:
+          reset: 0
+          interrupt: 0
+        flags:
+          swap_xy: false
+          mirror_x: false
+          mirror_y: false
+      io_i2c_config:
+        scl_speed_hz: 400000
+        control_phase_bytes: 1
+        dc_bit_offset: 0
+        lcd_cmd_bits: 8
+        lcd_param_bits: 0
+        transaction_timeout_ms: 0
+        flags:
+          dc_low_on_data: false
+          disable_control_phase: true
+    peripherals:
+      - i2c_name: i2c_touch
+        i2c_addr: [0x2A]
     dependencies:
+      espressif/esp_lcd_touch:
+        version: ==1.2.1
+        public: true
       espressif/esp_lcd_touch_cst816s:
         version: ==1.1.1~1
         public: true
