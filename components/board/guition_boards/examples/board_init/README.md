@@ -5,7 +5,7 @@ Board Manager. It does not draw a GUI or initialize audio/SD. Shared SPI
 boards acquire resources per device; do not replace this sequence with a
 bulk `esp_board_manager_init()` call.
 
-The manifest uses `guition-jc/guition_boards` 0.1.2 through
+The manifest uses `guition-jc/guition_boards` 0.2.0 through
 `override_path: "../../.."`. Replace `/path/to/esp-idf` with your ESP-IDF 6.1
 installation directory and run from this example directory:
 

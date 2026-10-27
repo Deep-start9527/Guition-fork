@@ -21,11 +21,11 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 
 ## 兼容性
 
-当前版本为 `0.1.4`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
+当前版本为 `0.2.0`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
 
 | 依赖 | 版本 |
 | --- | --- |
-| ESP-IDF | `>=6.1.0,<6.2.0` |
+| ESP-IDF | `>=6.1.0` |
 | `espressif/esp_board_manager` | `0.7.3~1` |
 | `espressif/esp_lcd_touch` | `1.2.1` |
 
@@ -95,7 +95,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 将本组件复制到应用的 `components/guition_boards`。组件发布到组件中心后，也可通过以下命令添加：
 
 ```bash
-idf.py add-dependency "guition-jc/guition_boards==0.1.4"
+idf.py add-dependency "guition-jc/guition_boards==0.2.0"
 ```
 
 本组件已声明 ESP Board Manager 依赖；各板型所需的驱动依赖由 ESP Board Manager 按所选配置生成。
