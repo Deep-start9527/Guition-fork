@@ -4,7 +4,9 @@
 #include "esp_board_manager.h"
 #include "esp_board_manager_includes.h"
 #include "esp_lv_adapter.h"
+#if CONFIG_GUITION_TOUCH_RESISTIVE
 #include "guition_touch.h"
+#endif
 #include "display.h"
 #include "display_rotation.h"
 #include "display_buffers.h"
@@ -20,6 +22,13 @@ esp_err_t display_init(void)
     }
     bool lcd_ready = false, touch_ready = false, brightness_ready = false;
     bool adapter_ready = false;
+#if CONFIG_GUITION_TOUCH_RESISTIVE
+    const char *touch_name = "lcd_touch_resistive";
+#elif CONFIG_GUITION_TOUCH_NONE
+    const char *touch_name = NULL;
+#else
+    const char *touch_name = "lcd_touch";
+#endif
     dev_display_lcd_handles_t *lcd = NULL;
     dev_display_lcd_config_t *lcd_cfg = NULL;
     esp_lcd_touch_handle_t touch = NULL;
@@ -39,20 +48,13 @@ esp_err_t display_init(void)
         goto fail;
     }
 
-    // Initialize only selected display devices. BMGR acquires their buses lazily.
-    // In particular, CAP/NONE must not initialize a conflicting resistive bus.
-    if (esp_board_manager_check_name("lcd_touch")) {
-        ret = esp_board_manager_init_device_by_name("lcd_touch");
+    if (touch_name && esp_board_manager_check_name(touch_name)) {
+        ret = esp_board_manager_init_device_by_name(touch_name);
         if (ret != ESP_OK) goto fail;
         touch_ready = true;
-#if CONFIG_GUITION_BOARD_TOUCH_ADAPTER
-        guition_touch_device_t *device = NULL;
-        ret = esp_board_manager_get_device_handle("lcd_touch", (void **)&device);
-        if (ret != ESP_OK) goto fail;
-        touch = guition_touch_get_handle(device);
-#elif CONFIG_ESP_BOARD_DEV_LCD_TOUCH_SUPPORT
+#if CONFIG_ESP_BOARD_DEV_LCD_TOUCH_SUPPORT
         dev_lcd_touch_handles_t *device = NULL;
-        ret = esp_board_manager_get_device_handle("lcd_touch", (void **)&device);
+        ret = esp_board_manager_get_device_handle(touch_name, (void **)&device);
         if (ret != ESP_OK) goto fail;
         if (device) touch = device->touch_handle;
 #endif
@@ -150,13 +152,13 @@ fail:
     s_disp = NULL;
     s_touch_indev = NULL;
     demo_display_rotation_cleanup();
-#if CONFIG_GUITION_BOARD_TOUCH_ADAPTER
+#if CONFIG_GUITION_TOUCH_RESISTIVE
     esp_err_t pending_cleanup = guition_touch_bmgr_recover();
     if (pending_cleanup != ESP_OK) {
         ESP_LOGE(TAG, "Pending touch cleanup failed: %s", esp_err_to_name(pending_cleanup));
     }
 #endif
-    const char *names[] = {"lcd_brightness", "lcd_touch", "display_lcd"};
+    const char *names[] = {"lcd_brightness", touch_name, "display_lcd"};
     const bool ready[] = {brightness_ready, touch_ready, lcd_ready};
     for (unsigned i = 0; i < sizeof(names) / sizeof(names[0]); ++i) {
         if (ready[i]) {

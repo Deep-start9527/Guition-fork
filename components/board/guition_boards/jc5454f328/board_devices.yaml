@@ -1,0 +1,198 @@
+# ESP32-S31, 540x540 AXS15260D/AXS15361 RGB565
+devices:
+  # microSD card on SDMMC 4-bit bus. Shares GPIO20~25 stuffing option with SPI NAND.
+  - name: fs_sdcard
+    type: fs_fat
+    sub_type: sdmmc
+    # power_ctrl_device: sdcard_power_ctrl
+    version: default
+    config:
+      mount_point: "/sdcard"
+      vfs_config:
+        format_if_mount_failed: false
+        max_files: 5
+        allocation_unit_size: 16384
+      sub_config:
+        slot: SDMMC_HOST_SLOT_0
+        frequency: SDMMC_FREQ_DEFAULT
+        bus_width: 4
+        slot_flags: SDMMC_SLOT_FLAG_INTERNAL_PULLUP
+        pins:
+          clk: 24
+          cmd: 25
+          d0: 20
+          d1: 21
+          d2: 22
+          d3: 23
+          cd: -1
+          wp: -1
+
+# RGB pixels with 3-wire/9-bit SPI controller initialization.
+# The 3-wire SPI IO sends LCD controller commands/parameters only; RGB transfers pixel data.
+  - name: display_lcd
+    type: display_lcd
+    version: 1.0.0
+    sub_type: rgb_3wire_spi                # RGB pixel bus plus 3-wire SPI command/init IO
+    chip: axs15260                     # AXS15260D RGB display and touch controller
+    dependencies:
+      espressif/esp_lcd_panel_io_additions: "*"  # Provides esp_lcd_new_panel_io_3wire_spi()
+      guition-jc/esp_lcd_axs15260: "*"
+    config:
+      swap_xy: false                      # Swap X/Y coordinates after panel init if the chip driver supports it
+      mirror_y: false                     # Mirror panel output on Y axis after panel init if supported
+      mirror_x: false                     # Mirror panel output on X axis after panel init if supported
+      invert_color: false                 # Invert panel colors after init if supported
+      need_reset: true                    # Whether to call esp_lcd_panel_reset() during device initialization
+      bits_per_pixel: 16                  # Application-side frame buffer color depth; IDF v5.x may emit this into RGB config
+      rgb_ele_order: LCD_RGB_ELEMENT_ORDER_BGR  # RGB/BGR byte order used by common panel helper logic
+      frame_format: RGB565_LE              # Application frame-buffer format; keep consistent with rgb_panel_config input format
+
+      # esp_lcd_panel_io_3wire_spi_config_t fields for the low-speed LCD command/init interface.
+      io_3wire_spi_config:
+        io_expander_name: ""              # Optional bmgr gpio_expander device name; empty when CS/SCL/SDA are direct GPIOs
+        line_config:
+          cs_io_type: IO_TYPE_GPIO        # CS line source: IO_TYPE_GPIO or IO_TYPE_EXPANDER
+          cs_gpio_num: 36             # [IO] SoC GPIO for CS when cs_io_type is IO_TYPE_GPIO
+          cs_expander_pin: -1             # IO expander pin for CS when cs_io_type is IO_TYPE_EXPANDER
+          scl_io_type: IO_TYPE_GPIO       # SCL/SCK line source: IO_TYPE_GPIO or IO_TYPE_EXPANDER
+          scl_gpio_num: 42                # [IO] SoC GPIO for SCL/SCK when scl_io_type is IO_TYPE_GPIO
+          scl_expander_pin: -1            # IO expander pin for SCL/SCK when scl_io_type is IO_TYPE_EXPANDER
+          sda_io_type: IO_TYPE_GPIO       # SDA/MOSI line source: IO_TYPE_GPIO or IO_TYPE_EXPANDER
+          sda_gpio_num: 40                # [IO] SoC GPIO for SDA/MOSI when sda_io_type is IO_TYPE_GPIO
+          sda_expander_pin: -1            # IO expander pin for SDA/MOSI when sda_io_type is IO_TYPE_EXPANDER
+        expect_clk_speed: 160000          # Expected bit-banged clock in Hz; max is PANEL_IO_3WIRE_SPI_CLK_MAX
+        spi_mode: 0                       # SPI mode 0~3; select according to LCD IC sampling edge/strap mode
+        lcd_cmd_bytes: 1                  # Bytes per LCD command package, valid range 1~4
+        lcd_param_bytes: 1                # Bytes per LCD parameter package, valid range 1~4
+        flags:
+          use_dc_bit: true                # Prefix each command/data package with an in-band D/C bit
+          dc_zero_on_data: false          # false: D/C=0 command and D/C=1 data; true reverses that mapping
+          lsb_first: false                # false sends MSB first; true sends LSB first
+          cs_high_active: false           # false means CS active low; true means CS active high
+          del_keep_cs_inactive: true      # Keep CS inactive on panel IO delete; SCL/SDA are still reset/released
+
+      # esp_lcd_rgb_panel_config_t fields for the RGB pixel data interface.
+      rgb_panel_config:
+        clk_src: LCD_CLK_SRC_DEFAULT      # RGB LCD peripheral clock source (lcd_clock_source_t)
+        data_width: 16                    # Number of RGB data lines wired to the panel, e.g., 8/16/18/24
+        in_color_format: LCD_COLOR_FMT_RGB565   # IDF v6+: frame buffer storage format consumed by RGB driver
+        out_color_format: LCD_COLOR_FMT_RGB565  # IDF v6+: on-wire RGB format expected by the panel
+        num_fbs: 3                        # Number of full-screen frame buffers allocated by driver; 0/1 means single FB
+        bounce_buffer_size_px: 0          # Bounce buffer size in pixels; non-zero enables internal DMA bounce buffers
+        dma_burst_size: 64                # DMA burst size in bytes; affects memory alignment/bandwidth behavior
+        hsync_gpio_num: 35                # [IO] GPIO used for HSYNC signal
+        vsync_gpio_num: 37                # [IO] GPIO used for VSYNC signal
+        de_gpio_num: 38                   # [IO] GPIO used for DE signal; set -1 if panel does not use DE
+        pclk_gpio_num: 18                 # [IO] GPIO used for pixel clock (PCLK)
+        disp_gpio_num: -1                 # [IO] Optional display enable pin; set -1 if not connected
+        data_gpio_nums: [13, 14, 15, 16, 17, 7, 8, 9, 10, 11, 12, 2, 3, 4, 5, 6]  # [IO] RGB data bus GPIOs, D0 upward
+        user_fbs_func: ""                 # Optional IDF v6+ DEVICE_EXTRA_FUNC_REGISTER callback for user-owned RGB frame buffers
+        timings:
+          pclk_hz: 34000000               # Pixel clock frequency in Hz; must satisfy panel timing budget
+          h_res: 540                      # Active horizontal resolution in pixels
+          v_res: 540                      # Active vertical resolution in lines
+          hsync_pulse_width: 20           # HSYNC pulse width, unit: PCLK cycles
+          hsync_back_porch: 160            # Horizontal back porch, between HSYNC and active data
+          hsync_front_porch: 160           # Horizontal front porch, between active data end and next HSYNC
+          vsync_pulse_width: 4           # VSYNC pulse width, unit: lines
+          vsync_back_porch: 20            # Vertical back porch, between VSYNC and first active line
+          vsync_front_porch: 80           # Vertical front porch, between last active line and next VSYNC
+          flags:
+            hsync_idle_low: false         # HSYNC idle polarity: false=idle high, true=idle low
+            vsync_idle_low: false         # VSYNC idle polarity: false=idle high, true=idle low
+            de_idle_high: false           # DE idle polarity: false=idle low, true=idle high
+            pclk_active_neg: false        # Sample/launch pixel data on falling edge of PCLK when true
+            pclk_idle_high: false         # Keep PCLK at high level during idle when true
+        flags:
+          disp_active_low: false          # disp_gpio_num active level: false=high turns panel on, true=low turns panel on
+          refresh_on_demand: false        # Disable continuous streaming; refresh only on draw_bitmap/explicit refresh
+          fb_in_psram: true               # Prefer allocating frame buffers in PSRAM when available
+          double_fb: false                # Convenience flag for two driver-owned frame buffers; conflicts with no_fb
+          no_fb: false                    # Driver does not allocate frame buffer; requires bounce buffer callback workflow
+          bb_invalidate_cache: false      # In bounce-buffer mode, invalidate cache after DMA reads
+
+      # esp_lcd_panel_dev_config_t fields passed to the LCD chip factory.
+      lcd_panel_config:
+        reset_gpio_num: 19                # [IO] Reset GPIO pin; set -1 if reset is not connected to a SoC GPIO
+        rgb_ele_order: LCD_RGB_ELEMENT_ORDER_BGR  # RGB/BGR element order for LCD controller command setup
+        data_endian: LCD_RGB_DATA_ENDIAN_BIG  # Not consumed by AXS RGB path; frame_format specifies framebuffer endian
+        bits_per_pixel: 16                # AXS RGB565 controller pixel width
+        flags:
+          reset_active_high: false        # Reset pin active level: false=active low, true=active high
+        vendor_config: NULL               # setup_device.c supplies the AXS vendor config from this YAML
+        auto_del_panel_io: true           # AXS driver sends init commands and deletes the IO before touch setup
+
+  - name: lcd_touch
+    chip: axs15260
+    type: lcd_touch
+    sub_type: i2c
+    version: default
+    dependencies:
+      guition-jc/esp_lcd_axs15260: "*"
+    config:
+      io_i2c_config:
+        control_phase_bytes: 1
+        dc_bit_offset: 0
+        lcd_cmd_bits: 8
+        # Keep the touch bus at standard-mode speed.  The AXS reference
+        # driver uses a simple single-message read and some panels do not
+        # reliably acknowledge the faster 400 kHz transaction.
+        scl_speed_hz: 100000
+        # Never let a failed touch read block the LVGL task indefinitely.
+        transaction_timeout_ms: 50
+        flags:
+          disable_control_phase: true
+
+      touch_config:
+        x_max: 540
+        y_max: 540
+        rst_gpio_num: -1
+        # Touch interrupt input; -1 selects polling instead.
+        int_gpio_num: 46
+        levels:
+          reset: 0
+          interrupt: 0
+        flags:
+          swap_xy: false
+          mirror_x: false
+          mirror_y: false
+    peripherals:
+      - name: i2c_master
+        i2c_addr: [0x76]  # AXS15260 8-bit I2C address, 7-bit address 0x3B
+
+  - name: lcd_brightness
+    type: ledc_ctrl
+    version: default
+    peripherals:
+      - name: ledc_backlight
+
+  # Direct I2S output with GPIO-controlled amplifier; no I2C DAC control.
+  - name: audio_dac
+    type: audio_codec
+    chip: internal
+    config:
+      adc_enabled: false
+      dac_enabled: true
+      sys_cfg:
+        no_mclk: true
+    peripherals:
+      - i2s_name: i2s_audio_out
+      - pa_name: gpio_pa_control
+        active_level: 1
+
+  - name: audio_adc
+    type: audio_codec
+    chip: es7210
+    config:
+      adc_enabled: true
+      dac_enabled: false
+      sys_cfg:
+        no_mclk: false
+      adc_cfg:
+        # Analog input order: MIC1, MIC2, MIC3, MIC4.
+        label: [FL, FR, NA, NA]
+    peripherals:
+      - i2s_name: i2s_audio_in
+      - i2c_name: i2c_audio
+        address: 0x80  # 8-bit address; 7-bit address is 0x40.
+        frequency: 400000

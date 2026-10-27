@@ -27,6 +27,7 @@ tags:
   - esp_board_manager
 files:
   exclude:
+    - "test/**/*"
     - "**/docs/**/*"
     - "**/tools/**/*"
     - "**/.vscode/**/*"

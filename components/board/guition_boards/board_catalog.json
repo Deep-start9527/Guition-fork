@@ -239,6 +239,17 @@
       ]
     },
     {
+      "model": "JC5454F328",
+      "board": "jc5454f328",
+      "target": "esp32s31",
+      "capacitive": true,
+      "resistive": false,
+      "default": "capacitive",
+      "drivers": [
+        "AXS15260"
+      ]
+    },
+    {
       "model": "JC8012P4A1C",
       "board": "jc8012p4a1",
       "target": "esp32p4",

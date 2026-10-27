@@ -28,6 +28,7 @@ components/gen_bmgr_codes/
 # Migration tooling bytecode caches
 tools/guition/**/__pycache__/
 tests/
+/components/board/guition_boards/test/
 tools/
 AGENTS.md
 docs/

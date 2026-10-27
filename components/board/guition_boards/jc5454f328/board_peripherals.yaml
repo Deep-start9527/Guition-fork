@@ -1,0 +1,73 @@
+peripherals:
+  - name: ledc_backlight
+    type: ledc
+    config:
+      gpio_num: 48
+      channel: LEDC_CHANNEL_0
+      timer_sel: LEDC_TIMER_0
+      freq_hz: 20000
+      duty_resolution: LEDC_TIMER_10_BIT
+      duty: 0
+      speed_mode: LEDC_LOW_SPEED_MODE
+      output_invert: false
+
+  - name: i2c_master
+    type: i2c
+    role: master
+    config:
+      port: 0
+      pins:
+        sda: 44
+        scl: 45
+
+  - name: i2c_audio
+    type: i2c
+    role: master
+    config:
+      port: 1
+      pins:
+        sda: 53
+        scl: 54
+
+  - name: i2s_audio_out
+    type: i2s
+    role: master
+    format: std-out
+    config:
+      port: 0
+      sample_rate_hz: 48000
+      data_bit_width: 16
+      slot_mode: I2S_SLOT_MODE_STEREO
+      slot_mask: I2S_STD_SLOT_BOTH
+      pins:
+        mclk: -1
+        bclk: 49
+        ws: 51
+        dout: 61
+        din: -1
+
+  - name: i2s_audio_in
+    type: i2s
+    role: master
+    format: std-in
+    config:
+      port: 1
+      sample_rate_hz: 48000
+      mclk_multiple: 256
+      data_bit_width: 16
+      slot_mode: I2S_SLOT_MODE_STEREO
+      slot_mask: I2S_STD_SLOT_BOTH
+      pins:
+        mclk: 55
+        bclk: 56
+        ws: 57
+        dout: -1
+        din: 59
+
+  - name: gpio_pa_control
+    type: gpio
+    role: io
+    config:
+      pin: 52
+      mode: GPIO_MODE_OUTPUT
+      default_level: 0

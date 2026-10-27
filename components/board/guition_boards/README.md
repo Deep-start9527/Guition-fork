@@ -8,7 +8,7 @@ Guition 开发板的 ESP Board Manager 板级支持组件，组件名为 `guitio
 
 本组件提供开发板信息、外设与设备配置、板级默认 sdkconfig，以及显示、触摸、背光和 SD 卡适配。添加组件后，通过 ESP Board Manager 选择板型并生成配置代码，即可在 ESP-IDF 应用中使用对应设备。
 
-每个板型目录包含以下配置，部分板型还提供设备初始化源码和 Kconfig 选项：
+每个板型目录可完整复制到其他 ESP-IDF 应用中独立使用，无须安装整个 `guition_boards` 组件。板型目录包含自身所需的初始化源码、触摸支持、Kconfig 选项及以下配置：
 
 - `board_info.yaml`：板型标识、目标芯片和厂商信息。
 - `board_peripherals.yaml`：总线、GPIO 等外设配置。
@@ -29,7 +29,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 | `espressif/esp_board_manager` | `0.7.3~1` |
 | `espressif/esp_lcd_touch` | `1.2.1` |
 
-组件清单声明的目标为 ESP32、ESP32-C3、ESP32-S3、ESP32-P4 和 ESP32-S31，共 24 个板型配置。ESP32-S31 板型需要所用 ESP-IDF 环境提供 `esp32s31` 目标支持。
+组件清单声明的目标为 ESP32、ESP32-C3、ESP32-S3、ESP32-P4 和 ESP32-S31，共 26 个板型配置。ESP32-S31 板型需要所用 ESP-IDF 环境提供 `esp32s31` 目标支持。
 
 ## 支持的开发板
 
@@ -50,6 +50,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 
 | 板型标识 | LCD（接口） | 分辨率 | 触摸 | SD 卡 | 音频 |
 | --- | --- | --- | --- | --- | --- |
+| [jc5454f328](jc5454f328/) | AXS15260（三线 SPI + RGB） | 540×540 | AXS15260 | SDMMC | I2S DAC + ES7210 ADC |
 | [jc8048f543](jc8048f543/) | 通用 RGB 面板（RGB） | 800×480 | GT911 | SDMMC | ES8389（DAC + ADC） |
 | [jc8048f550](jc8048f550/) | 通用 RGB 面板（RGB） | 800×480 | GT911 | SDMMC | ES8389（DAC + ADC） |
 | [jc3636f118](jc3636f118/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC | — |
@@ -99,6 +100,20 @@ idf.py add-dependency "guition-jc/guition_boards==0.1.4"
 
 本组件已声明 ESP Board Manager 依赖；各板型所需的驱动依赖由 ESP Board Manager 按所选配置生成。
 
+单独使用板型时，将完整板型目录复制到应用的 `components/` 下。例如复制 `jc3636k718/` 后，在应用目录执行：
+
+```bash
+. /path/to/esp-idf/export.sh
+idf.py add-dependency "espressif/esp_board_manager==0.7.3~1"
+idf.py set-target esp32s3
+idf.py bmgr -b jc3636k718
+idf.py menuconfig
+idf.py build
+idf.py -p <PORT> flash monitor
+```
+
+板型目录内的 `.c` 文件由 BMGR 生成组件统一编译；不要额外注册同一份触摸源码。无触摸模式仍需保留板型声明的基础触摸 API 依赖。总线和触摸参数均在板型自己的 YAML 文件中配置。
+
 可直接使用本组件的 [board_init 示例](examples/board_init/README.md)。将 `/path/to/esp-idf` 替换为本地 ESP-IDF 6.1 安装目录后执行：
 
 ```bash
@@ -113,19 +128,16 @@ idf.py -p <PORT> flash monitor
 
 示例通过相对 `override_path` 引用本组件，初始化 LCD、触摸和背光，不绘制界面，也不初始化音频或 SD 卡。复制示例到其他位置时，需更新 `main/idf_component.yml` 中的本地组件路径。
 
-使用其他开发板时，将目标芯片和板型标识替换为对应值；切换板型后重新生成 BMGR 配置。切换目标芯片时建议使用独立工程目录，避免沿用旧的生成配置。
+使用其他开发板时，将目标芯片和板型标识替换为对应值；切换板型后重新生成 BMGR 配置。切换目标芯片时建议使用独立工程目录，避免沿用旧的生成配置。ESP32-S31 是 ESP-IDF 6.1 的预览目标，相关命令需在 `idf.py` 后、动作名前添加 `--preview`，例如 `idf.py --preview bmgr -b jc5454f328` 和 `idf.py --preview build`。
 
 ## 配置与使用说明
 
 - **触摸选择**：ESP32、ESP32-C3 和 ESP32-S3 板型在 menuconfig 的 `Guition touch` 中选择电容、电阻或无触摸，选项由板型能力决定。ESP32-P4 使用各板原生触摸配置。
-- **设备初始化**：按名称调用 `esp_board_manager_init_device_by_name()` 初始化 `display_lcd`、`lcd_touch` 和 `lcd_brightness`，具体顺序见示例。多触摸变体板型不要使用 `esp_board_manager_init()` 批量初始化全部外设，以免启用未选择的总线。
+- **触摸参数**：电容触摸使用 BMGR 原生 `lcd_touch` 设备，分辨率、复位与中断 GPIO、方向和 IO 参数在 `board_devices.yaml` 的 `lcd_touch.config` 中配置；`peripherals.i2c_addr` 使用左移一位的 I²C 地址，例如 7 位地址 `0x15` 写为 `[0x2A]`。电阻触摸使用 `lcd_touch_resistive.config`，引脚来自 `board_peripherals.yaml`。ESP32-2432S028 使用独立的软件 SPI；与 LCD 或 SD 卡共线的型号使用 ESP-IDF 硬件 SPI 管理共享总线。修改 YAML 后执行 `idf.py bmgr -b <board>` 和 `idf.py build`；ESP32-S31 在 `idf.py` 后添加 `--preview`。
+- **设备初始化**：多触摸变体板型的触摸设备设置 `init_skip: true`，应用根据 `CONFIG_GUITION_TOUCH_CAPACITIVE` / `CONFIG_GUITION_TOUCH_RESISTIVE` 显式初始化 `lcd_touch` / `lcd_touch_resistive`，无触摸时跳过。两者均通过 `dev_lcd_touch_handles_t.touch_handle` 提供句柄。YAML 的依赖 `matches` 根据 menuconfig 选择驱动依赖；设备初始化选择见 [board_init 示例](examples/board_init/main/board_init.c)。不要批量初始化全部外设，以免启用未选择的总线。
 - **显示缓冲**：本组件的 ESP32 / ESP32-C3 板型没有 PSRAM，应用需使用内部 RAM 缓冲。JC3248W535 的 AXS15231B 驱动要求整帧提交，应用需配置相应的刷新方式。
-- **SD 卡**：支持的板型通过 `GUITION_SD_ENABLED` 启用，默认关闭。通过 ESP Board Manager 的 `fs_sdcard` 设备管理挂载、卸载及卡句柄；参数由板级设备和外设配置提供。共享 SPI 的板型需要应用协调片选状态、LCD / 触摸初始化顺序及挂载期间的触摸轮询。
+- **SD 卡**：提供 SD 选项的板型通过 `GUITION_SD_ENABLED` 启用，默认关闭。JC5454F328 使用原生 `fs_sdcard` 设备，由应用显式初始化，不使用 `GUITION_SD_ENABLED`。通过 ESP Board Manager 的 `fs_sdcard` 设备管理挂载、卸载及卡句柄；参数由板级设备和外设配置提供。共享 SPI 的板型需要应用协调片选状态、LCD / 触摸初始化顺序及挂载期间的触摸轮询。
 - **JC4827W543 电阻触摸版 SD 卡**：使用 FAT32 文件系统。
 - **P4 配置**：旧版芯片需在 menuconfig 中选择匹配的芯片版本；应用需提供与 Flash 容量匹配的分区表，示例已附带分区表。当前 SD 电源配置保留 LDO4，需按实际硬件确认。
 
-触摸公共接口见 [guition_touch.h](include/guition_touch.h)，板型与触摸变体索引见 [board_catalog.json](board_catalog.json)。
-
-## 许可证
-
-公共适配代码采用 [MIT 许可证](LICENSE)。原板型文件和初始化表保留各自的许可证，详见 [NOTICE](NOTICE) 和 [LICENSES](LICENSES/)。
+板型与触摸变体索引见 [board_catalog.json](board_catalog.json)。

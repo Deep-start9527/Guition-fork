@@ -22,4 +22,14 @@ endchoice
 
 endmenu
 
+config GUITION_BOARD_HAS_SD
+    bool
+    default y
+
+config GUITION_SD_ENABLED
+    bool "Enable Guition SD card support"
+    depends on GUITION_BOARD_HAS_SD
+    default n
+    select ESP_BOARD_DEV_FS_FAT_SUPPORT
+
 endif
