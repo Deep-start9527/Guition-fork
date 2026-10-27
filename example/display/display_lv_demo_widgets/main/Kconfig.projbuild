@@ -1,5 +1,28 @@
 menu "Demo display"
 
+choice DEMO_LCD_COLOR_FORMAT
+    prompt "Display color format"
+    default DEMO_LCD_COLOR_RGB888 if ESP_BOARD_DEV_DISPLAY_LCD_SUB_DSI_SUPPORT
+    default DEMO_LCD_COLOR_RGB565
+    help
+        Select the LVGL draw-buffer and LCD frame-buffer format. This setting
+        overrides the LVGL color format and color depth menus. DSI defaults
+        to RGB888; other interfaces default to RGB565. DSI panel input and
+        output formats follow this choice.
+        Other interfaces must use their board's native format; RGB565-only
+        boards and the SPI software rotation path require RGB565.
+
+config DEMO_LCD_COLOR_RGB565
+    bool "RGB565 (16-bit)"
+    depends on !ESP_BOARD_JC4880P443
+    select LV_DRAW_SW_SUPPORT_RGB565
+
+config DEMO_LCD_COLOR_RGB888
+    bool "RGB888 (24-bit)"
+    select LV_DRAW_SW_SUPPORT_RGB888
+
+endchoice
+
 config DEMO_SPI_DRAW_BUFFER_LINES
     int "SPI partial draw buffer lines (non-TE displays)"
     depends on ESP_BOARD_DEV_DISPLAY_LCD_SUB_SPI_SUPPORT && !ESP_BOARD_JC3248W535
@@ -120,7 +143,37 @@ config DEMO_LCD_REFRESH_TRIPLE_FULL
     bool "Triple buffer, full refresh (board num_fbs = 3)"
     help
         Requires three panel frame buffers and redraws the entire screen.
+        With software rotation, one PSRAM frame buffer is the LVGL drawing
+        source and the other two are rotation/display targets. No separate
+        internal RAM drawing strip is allocated.
 
 endchoice
+
+config DEMO_MIPI_DRAW_BUFFER_LINES
+    int "MIPI software rotation partial draw buffer lines"
+    depends on ESP_BOARD_DEV_DISPLAY_LCD_SUB_DSI_SUPPORT
+    depends on DEMO_LCD_ROTATION_SOFTWARE && !DEMO_LCD_ROTATION_0
+    depends on DEMO_LCD_REFRESH_DOUBLE_PARTIAL || DEMO_LCD_REFRESH_TRIPLE_PARTIAL
+    range 20 120
+    default 80
+    help
+        Buffer capacity is physical LCD width times this number of lines.
+        ESP LVGL Adapter 0.7.1 allocates one internal RAM buffer in partial
+        refresh modes, even if PSRAM is available. At 480 pixels wide, 80
+        lines require 76800 bytes for RGB565 or 115200 bytes for RGB888.
+        Larger buffers reduce rotation/flush submissions. Use 20 lines for
+        lower internal RAM use, or full refresh to draw in PSRAM instead.
+
+config DEMO_DISPLAY_PERF_STATS
+    bool "Log display refresh performance"
+    default n
+    help
+        Log LVGL refresh rate, refresh processing duration (average, P95,
+        maximum) and free internal RAM/PSRAM every five seconds. Only
+        refreshes with rendering are counted. Flush callbacks and waits
+        are timed separately from the remaining processing. Overlapping
+        intervals are counted once. These measurements do not include
+        asynchronous panel presentation time.
+        Disable for normal operation to remove diagnostic overhead.
 
 endmenu

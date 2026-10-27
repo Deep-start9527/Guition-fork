@@ -8,6 +8,8 @@
 - Retain SPI extensions only for the seven resistive-touch boards. Use software SPI on `esp32_2432s028`, reading pins from peripheral YAML, and ESP-IDF hardware SPI on boards sharing the bus with LCD or SD devices.
 - **Breaking change:** Replace the custom touch creation and handle APIs with Board Manager device initialization and `dev_lcd_touch_handles_t.touch_handle`. Applications must select `lcd_touch` for capacitive touch or `lcd_touch_resistive` for resistive touch according to menuconfig, and skip touch initialization in no-touch mode. Configurable touch devices use `init_skip: true` and require explicit initialization.
 - Update both initialization examples for the selected touch device and exclude local tests from component release archives.
+- Use the `guition` Component Registry namespace for board and driver dependencies, retaining the `Guition-JC/Guition` source repository.
+- Add display color selection, configurable MIPI partial draw buffers and optional LVGL refresh statistics to `display_lv_demo_widgets`.
 
 ## 0.1.4
 

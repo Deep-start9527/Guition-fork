@@ -36,7 +36,7 @@ devices:
     chip: axs15260                     # AXS15260D RGB display and touch controller
     dependencies:
       espressif/esp_lcd_panel_io_additions: "*"  # Provides esp_lcd_new_panel_io_3wire_spi()
-      guition-jc/esp_lcd_axs15260: "*"
+      guition/esp_lcd_axs15260: "*"
     config:
       swap_xy: false                      # Swap X/Y coordinates after panel init if the chip driver supports it
       mirror_y: false                     # Mirror panel output on Y axis after panel init if supported
@@ -128,7 +128,7 @@ devices:
     sub_type: i2c
     version: default
     dependencies:
-      guition-jc/esp_lcd_axs15260: "*"
+      guition/esp_lcd_axs15260: "*"
     config:
       io_i2c_config:
         control_phase_bytes: 1

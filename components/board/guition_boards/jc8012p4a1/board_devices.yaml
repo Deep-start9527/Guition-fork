@@ -79,7 +79,7 @@ devices:
     sub_type: i2c
     version: default
     dependencies:
-      guition-jc/esp_lcd_touch_gsl3680: ==0.1.0
+      guition/esp_lcd_touch_gsl3680: ==0.1.0
     config:
       io_i2c_config:
         lcd_cmd_bits: 8

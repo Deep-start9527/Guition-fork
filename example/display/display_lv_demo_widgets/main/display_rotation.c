@@ -129,6 +129,14 @@ esp_err_t demo_display_rotation_configure(const dev_display_lcd_config_t *lcd,
         // Full-refresh modes use full panel buffers; partial modes use strips.
         config->profile.buffer_height = 20;
         config->profile.use_psram = false;
+#if CONFIG_DEMO_MIPI_DRAW_BUFFER_LINES
+        if (strcmp(lcd->sub_type, "dsi") == 0 &&
+            (config->tear_avoid_mode == ESP_LV_ADAPTER_TEAR_AVOID_MODE_DOUBLE_PARTIAL ||
+             config->tear_avoid_mode == ESP_LV_ADAPTER_TEAR_AVOID_MODE_TRIPLE_PARTIAL)) {
+            config->profile.buffer_height = lcd->lcd_height < CONFIG_DEMO_MIPI_DRAW_BUFFER_LINES ?
+                                            lcd->lcd_height : CONFIG_DEMO_MIPI_DRAW_BUFFER_LINES;
+        }
+#endif
         return ESP_OK;
     }
     if (config->tear_avoid_mode == ESP_LV_ADAPTER_TEAR_AVOID_MODE_TE_SYNC &&

@@ -4,7 +4,7 @@
 
 如果发现某个开发板配置存在问题，欢迎在 [Guition 仓库](https://github.com/Guition-JC/Guition)中[提交 Issue](https://github.com/Guition-JC/Guition/issues)。
 
-Guition 开发板的 ESP Board Manager 板级支持组件，组件名为 `guition-jc/guition_boards`。
+Guition 开发板的 ESP Board Manager 板级支持组件，组件名为 `guition/guition_boards`。
 
 本组件提供开发板信息、外设与设备配置、板级默认 sdkconfig，以及显示、触摸、背光和 SD 卡适配。添加组件后，通过 ESP Board Manager 选择板型并生成配置代码，即可在 ESP-IDF 应用中使用对应设备。
 
@@ -95,7 +95,7 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 将本组件复制到应用的 `components/guition_boards`。组件发布到组件中心后，也可通过以下命令添加：
 
 ```bash
-idf.py add-dependency "guition-jc/guition_boards==0.2.0"
+idf.py add-dependency "guition/guition_boards==0.2.0"
 ```
 
 本组件已声明 ESP Board Manager 依赖；各板型所需的驱动依赖由 ESP Board Manager 按所选配置生成。

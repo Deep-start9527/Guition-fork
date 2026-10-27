@@ -1,6 +1,7 @@
 #include <string.h>
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "esp_board_manager.h"
 #include "esp_board_manager_includes.h"
 #include "esp_lv_adapter.h"
@@ -10,6 +11,8 @@
 #include "display.h"
 #include "display_rotation.h"
 #include "display_buffers.h"
+#include "display_color.h"
+#include "display_perf.h"
 
 static const char *TAG = "Display";
 static lv_display_t *s_disp;
@@ -32,7 +35,11 @@ esp_err_t display_init(void)
     dev_display_lcd_handles_t *lcd = NULL;
     dev_display_lcd_config_t *lcd_cfg = NULL;
     esp_lcd_touch_handle_t touch = NULL;
-    esp_err_t ret = esp_board_manager_init_device_by_name("display_lcd");
+    esp_err_t ret = demo_display_color_configure();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    ret = esp_board_manager_init_device_by_name("display_lcd");
     if (ret != ESP_OK) {
         return ret;
     }
@@ -114,10 +121,34 @@ esp_err_t display_init(void)
     adapter_ready = true;
     s_disp = esp_lv_adapter_register_display(&display_config);
     if (!s_disp) {
+        ESP_LOGE(TAG, "Display registration failed; free internal=%zu, largest internal block=%zu, free PSRAM=%zu",
+                 heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                 heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                 heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
         ret = ESP_ERR_NO_MEM;
         goto fail;
     }
+    if (strcmp(lcd_cfg->sub_type, ESP_BOARD_DEVICE_LCD_SUB_TYPE_DSI) == 0 &&
+        display_config.profile.rotation != ESP_LV_ADAPTER_ROTATE_0) {
+        const bool partial = display_config.tear_avoid_mode == ESP_LV_ADAPTER_TEAR_AVOID_MODE_DOUBLE_PARTIAL ||
+                             display_config.tear_avoid_mode == ESP_LV_ADAPTER_TEAR_AVOID_MODE_TRIPLE_PARTIAL;
+        const size_t draw_bytes = (size_t)lcd_cfg->lcd_width * (LV_COLOR_DEPTH / 8) *
+                                  (partial ? display_config.profile.buffer_height : lcd_cfg->lcd_height);
+        ESP_LOGI(TAG, "MIPI depth=%d, rotation=%d, mode=%d, sw_draw_units=%d, draw=%zu bytes (%s), free internal=%zu, free PSRAM=%zu",
+                 LV_COLOR_DEPTH, display_config.profile.rotation, display_config.tear_avoid_mode,
+                 LV_DRAW_SW_DRAW_UNIT_CNT, draw_bytes,
+                 partial ? "internal strip" : "PSRAM panel frame",
+                 heap_caps_get_free_size(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT),
+                 heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+#if CONFIG_IDF_TARGET_ESP32P4
+        ESP_LOGI(TAG, "P4 L2 cache=%u KiB, line=%u bytes",
+                 (unsigned)(CONFIG_CACHE_L2_CACHE_SIZE / 1024),
+                 (unsigned)CONFIG_CACHE_L2_CACHE_LINE_SIZE);
+#endif
+    }
     ret = demo_display_rotation_attach(s_disp);
+    if (ret != ESP_OK) goto fail;
+    ret = demo_display_perf_attach(s_disp);
     if (ret != ESP_OK) goto fail;
     if (touch) {
         esp_lv_adapter_touch_config_t touch_config = {
