@@ -1,12 +1,14 @@
 # Guition Boards
 
+[English](README_EN.md) | 简体中文
+
 部分开发板配置可能不完善，会在之后逐渐完善。
 
 如果发现某个开发板配置存在问题，欢迎在 [Guition 仓库](https://github.com/Guition-JC/Guition)中[提交 Issue](https://github.com/Guition-JC/Guition/issues)。
 
 Guition 开发板的 ESP Board Manager 板级支持组件，组件名为 `guition/guition_boards`。
 
-本组件提供开发板信息、外设与设备配置、板级默认 sdkconfig，以及显示、触摸、背光和 SD 卡适配。添加组件后，通过 ESP Board Manager 选择板型并生成配置代码，即可在 ESP-IDF 应用中使用对应设备。
+本组件提供开发板信息、外设与设备配置、板级默认 sdkconfig，以及显示、触摸、背光、SD 卡和音频适配。添加组件后，通过 ESP Board Manager 选择板型并生成配置代码，即可在 ESP-IDF 应用中使用对应设备。
 
 每个板型目录可完整复制到其他 ESP-IDF 应用中独立使用，无须安装整个 `guition_boards` 组件。板型目录包含自身所需的初始化源码、触摸支持、Kconfig 选项及以下配置：
 
@@ -17,11 +19,11 @@ Guition 开发板的 ESP Board Manager 板级支持组件，组件名为 `guitio
 
 板级 YAML 使用两空格缩进，列表项相对所属字段缩进一级，设备和外设条目之间保留空行。标量数组采用行内形式（如 `[FL, FR]`），I2C 地址采用十六进制（如 `0x30`、`[0xBA, 0x28]`）；描述、厂商、挂载路径和需要引号的字符串使用双引号。
 
-ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/esp-board-manager/blob/main/README.md)。本文的板型列表组织方式参考 [ESP Boards](https://github.com/espressif/esp-board-manager/blob/main/esp_boards/README.md)。
+ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/esp-board-manager/blob/main/README.md)。
 
 ## 兼容性
 
-当前版本为 `0.2.0`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
+当前版本为 `0.2.1`，依赖要求以 [idf_component.yml](idf_component.yml) 为准：
 
 | 依赖 | 版本 |
 | --- | --- |
@@ -53,26 +55,25 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 | [jc5454f328](jc5454f328/) | AXS15260（三线 SPI + RGB） | 540×540 | AXS15260 | SDMMC | I2S DAC + ES7210 ADC |
 | [jc8048f543](jc8048f543/) | 通用 RGB 面板（RGB） | 800×480 | GT911 | SDMMC | ES8389（DAC + ADC） |
 | [jc8048f550](jc8048f550/) | 通用 RGB 面板（RGB） | 800×480 | GT911 | SDMMC | ES8389（DAC + ADC） |
-| [jc3636f118](jc3636f118/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC | — |
+| [jc3636f118](jc3636f118/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC | PDM 输入 + I2S 输出 |
 | [jc1060f570c](jc1060f570c/) | 通用 RGB 面板（RGB） | 1024×600 | GT911 | SDMMC | ES8389（DAC + ADC） |
 
-`jc8048f543` 与 `jc8048f550` 的屏幕物理尺寸不同，分辨率、引脚、显示时序、触摸、音频、SD 卡和板级默认配置相同。
 
 ### ESP32-S3
 
-| 板型标识 | LCD（接口） | 分辨率 | 触摸 | SD 卡 |
-| --- | --- | --- | --- | --- |
-| [esp32_4827s043](esp32_4827s043/) | ST7262（RGB） | 480×272 | GT911 / XPT2046 / 无 | SPI |
-| [esp32_4848s040](esp32_4848s040/) | ST7701（三线 SPI + RGB） | 480×480 | GT911 / 无 | SPI |
-| [esp32_8048s043](esp32_8048s043/) | ST7262（RGB） | 800×480 | GT911 / 无 | SPI |
-| [esp32_8048s050](esp32_8048s050/) | ST7262（RGB） | 800×480 | GT911 / 无 | SPI |
-| [esp32_8048s070](esp32_8048s070/) | ST7262（RGB） | 800×480 | GT911 / 无 | SPI |
-| [jc3248w535](jc3248w535/) | AXS15231B（QSPI） | 320×480 | AXS15231B / 无 | SPI |
-| [jc3636k518](jc3636k518/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC |
-| [jc3636k718](jc3636k718/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC |
-| [jc3636w518](jc3636w518/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC |
-| [jc4827w543](jc4827w543/) | ST77916（QSPI） | 480×272 | GT911 / XPT2046 / 无 | SPI |
-| [jc8048w550](jc8048w550/) | ST7262（RGB） | 800×480 | GT911 / 无 | SPI |
+| 板型标识 | LCD（接口） | 分辨率 | 触摸 | SD 卡 | 音频 |
+| --- | --- | --- | --- | --- | --- |
+| [esp32_4827s043](esp32_4827s043/) | ST7262（RGB） | 480×272 | GT911 / XPT2046 / 无 | SPI | - |
+| [esp32_4848s040](esp32_4848s040/) | ST7701（三线 SPI + RGB） | 480×480 | GT911 / 无 | SPI | - |
+| [esp32_8048s043](esp32_8048s043/) | ST7262（RGB） | 800×480 | GT911 / 无 | SPI | - |
+| [esp32_8048s050](esp32_8048s050/) | ST7262（RGB） | 800×480 | GT911 / 无 | SPI | - |
+| [esp32_8048s070](esp32_8048s070/) | ST7262（RGB） | 800×480 | GT911 / 无 | SPI | - |
+| [jc3248w535](jc3248w535/) | AXS15231B（QSPI） | 320×480 | AXS15231B / 无 | SPI | - |
+| [jc3636k518](jc3636k518/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC | PDM 输入 |
+| [jc3636k718](jc3636k718/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC | PDM 输入 + I2S 输出 |
+| [jc3636w518](jc3636w518/) | ST77916（QSPI） | 360×360 | CST816S / 无 | SDMMC | PDM 输入 + I2S 输出 |
+| [jc4827w543](jc4827w543/) | ST77916（QSPI） | 480×272 | GT911 / XPT2046 / 无 | SPI | - |
+| [jc8048w550](jc8048w550/) | ST7262（RGB） | 800×480 | GT911 / 无 | SPI | - |
 
 ### ESP32
 
@@ -92,38 +93,80 @@ ESP Board Manager 的完整用法见[组件文档](https://github.com/espressif/
 
 ## 快速开始
 
+### 安装与激活 ESP-IDF
+
+推荐使用 [ESP-IDF Installation Manager（EIM）](https://docs.espressif.com/projects/idf-im-ui/en/latest/) 下载并安装 ESP-IDF 6.1 及所需工具链。以下命令适用于 Linux / macOS 的默认安装路径；自定义安装位置时，使用 EIM 生成的实际激活脚本路径。
+
+每次打开终端后，按所用 Shell 选择一种方式激活环境。
+
+Bash / Zsh：
+
+```bash
+source ~/.espressif/tools/activate_idf_v6.1.sh
+```
+
+Fish：
+
+```fish
+source ~/.espressif/tools/activate_idf_v6.1.fish
+```
+
+激活环境后，从乐鑫组件中心下载的 `espressif/esp_board_manager` 扩展属于 ESP-IDF 的受信任来源，本流程无须手动设置 `IDF_EXTENSION_ALLOW_UNTRUSTED` 即可使用 `bmgr` 命令。下列操作均在已激活的终端中执行。
+
+### 从组件中心获取 LVGL 示例
+
+`idf.py add-dependency` 添加组件依赖，不会同时下载独立发布的示例工程。要运行 `display_lv_demo_widgets`，在用于存放工程的目录执行：
+
+```bash
+idf.py create-project-from-example "guition/guition_boards=0.2.1:display_lv_demo_widgets"
+cd display_lv_demo_widgets
+idf.py set-target esp32p4
+idf.py bmgr -b jc8012p4a1
+idf.py menuconfig
+idf.py build
+idf.py -p PORT flash monitor
+```
+
+该流程以 `jc8012p4a1` 为例，将 `PORT` 替换为实际串口。创建示例的命令下载工程源码；首次配置或构建时，组件管理器会自动拉取 `guition_boards` 及其他依赖到 `managed_components/`。示例已声明 `guition_boards` 依赖，默认版本约束为 `"*"`，自动获取满足工程约束的版本，无须再次添加依赖。若需固定组件版本，在配置或构建前，将 `main/idf_component.yml` 中 `guition/guition_boards` 的版本改为 `"==0.2.1"`。
+
+此命令要求组件中心的 `0.2.1` 版本已发布并包含 `display_lv_demo_widgets` 示例。若提示 `Cannot find example`，请检查该版本的 Examples 页面和示例名称；用法见[乐鑫示例工程文档](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/tools/idf-component-manager.html#creating-a-project-from-an-example)。
+
+### 在现有工程中添加组件
+
 将本组件复制到应用的 `components/guition_boards`。组件发布到组件中心后，也可通过以下命令添加：
 
 ```bash
-idf.py add-dependency "guition/guition_boards==0.2.0"
+idf.py add-dependency "guition/guition_boards==0.2.1"
 ```
 
 本组件已声明 ESP Board Manager 依赖；各板型所需的驱动依赖由 ESP Board Manager 按所选配置生成。
 
+### 单独使用板型
+
 单独使用板型时，将完整板型目录复制到应用的 `components/` 下。例如复制 `jc3636k718/` 后，在应用目录执行：
 
 ```bash
-. /path/to/esp-idf/export.sh
 idf.py add-dependency "espressif/esp_board_manager==0.7.3~1"
 idf.py set-target esp32s3
 idf.py bmgr -b jc3636k718
 idf.py menuconfig
 idf.py build
-idf.py -p <PORT> flash monitor
+idf.py -p PORT flash monitor
 ```
 
 板型目录内的 `.c` 文件由 BMGR 生成组件统一编译；不要额外注册同一份触摸源码。无触摸模式仍需保留板型声明的基础触摸 API 依赖。总线和触摸参数均在板型自己的 YAML 文件中配置。
 
-可直接使用本组件的 [board_init 示例](examples/board_init/README.md)。将 `/path/to/esp-idf` 替换为本地 ESP-IDF 6.1 安装目录后执行：
+### 本地初始化示例
+
+可直接使用本组件的 [board_init 示例](examples/board_init/README.md)。从本组件目录执行：
 
 ```bash
-. /path/to/esp-idf/export.sh
 cd examples/board_init
 idf.py set-target esp32p4
 idf.py bmgr -b jc8012p4a1
 idf.py menuconfig
 idf.py build
-idf.py -p <PORT> flash monitor
+idf.py -p PORT flash monitor
 ```
 
 示例通过相对 `override_path` 引用本组件，初始化 LCD、触摸和背光，不绘制界面，也不初始化音频或 SD 卡。复制示例到其他位置时，需更新 `main/idf_component.yml` 中的本地组件路径。
@@ -137,7 +180,7 @@ idf.py -p <PORT> flash monitor
 - **设备初始化**：多触摸变体板型的触摸设备设置 `init_skip: true`，应用根据 `CONFIG_GUITION_TOUCH_CAPACITIVE` / `CONFIG_GUITION_TOUCH_RESISTIVE` 显式初始化 `lcd_touch` / `lcd_touch_resistive`，无触摸时跳过。两者均通过 `dev_lcd_touch_handles_t.touch_handle` 提供句柄。YAML 的依赖 `matches` 根据 menuconfig 选择驱动依赖；设备初始化选择见 [board_init 示例](examples/board_init/main/board_init.c)。不要批量初始化全部外设，以免启用未选择的总线。
 - **显示缓冲**：本组件的 ESP32 / ESP32-C3 板型没有 PSRAM，应用需使用内部 RAM 缓冲。JC3248W535 的 AXS15231B 驱动要求整帧提交，应用需配置相应的刷新方式。
 - **SD 卡**：提供 SD 选项的板型通过 `GUITION_SD_ENABLED` 启用，默认关闭。JC5454F328 使用原生 `fs_sdcard` 设备，由应用显式初始化，不使用 `GUITION_SD_ENABLED`。通过 ESP Board Manager 的 `fs_sdcard` 设备管理挂载、卸载及卡句柄；参数由板级设备和外设配置提供。共享 SPI 的板型需要应用协调片选状态、LCD / 触摸初始化顺序及挂载期间的触摸轮询。
-- **JC4827W543 电阻触摸版 SD 卡**：使用 FAT32 文件系统。
-- **P4 配置**：旧版芯片需在 menuconfig 中选择匹配的芯片版本；应用需提供与 Flash 容量匹配的分区表，示例已附带分区表。当前 SD 电源配置保留 LDO4，需按实际硬件确认。
+- **SD 卡**：使用 FAT32 文件系统。
+- **P4 配置**：旧版芯片需在 menuconfig 中选择匹配的芯片版本；应用需提供与 Flash 容量匹配的分区表，示例已附带分区表。
 
 板型与触摸变体索引见 [board_catalog.json](board_catalog.json)。
