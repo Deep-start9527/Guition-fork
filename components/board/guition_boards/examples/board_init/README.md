@@ -5,18 +5,36 @@ Board Manager. It does not draw a GUI or initialize audio/SD. Shared SPI
 boards acquire resources per device; do not replace this sequence with a
 bulk `esp_board_manager_init()` call.
 
-The manifest uses `guition/guition_boards` 0.2.0 through
-`override_path: "../../.."`. Replace `/path/to/esp-idf` with your ESP-IDF 6.1
-installation directory and run from this example directory:
+Install ESP-IDF 6.1 with the recommended
+[ESP-IDF Installation Manager (EIM)](https://docs.espressif.com/projects/idf-im-ui/en/latest/).
+Activate the environment in each new terminal. For Bash/Zsh:
 
 ```bash
-. /path/to/esp-idf/export.sh
+source ~/.espressif/tools/activate_idf_v6.1.sh
+```
+
+For Fish:
+
+```fish
+source ~/.espressif/tools/activate_idf_v6.1.fish
+```
+
+After activation, ESP-IDF trusts the `espressif/esp_board_manager` extension
+downloaded from the ESP Component Registry. This workflow does not require
+setting `IDF_EXTENSION_ALLOW_UNTRUSTED` manually to use `bmgr`.
+
+The manifest uses `guition/guition_boards` 0.2.1 through
+`override_path: "../../.."`. Run from this example directory:
+
+```shell
 idf.py set-target esp32p4
 idf.py bmgr -b jc8012p4a1
 idf.py menuconfig
 idf.py build
-idf.py -p <PORT> flash monitor
+idf.py -p PORT flash monitor
 ```
+
+Replace `PORT` with your device's serial port.
 
 JC8012P4A1C also needs the published `guition/esp_lcd_touch_gsl3680` 0.1.0.
 The touch driver is downloaded from the registry without a local override.

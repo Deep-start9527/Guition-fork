@@ -1,10 +1,33 @@
-使用 ESP-IDF 6.1。板级支持由组件中心的 `guition/guition_boards: "*"` 提供，首次解析依赖时下载满足工程约束的最新版本。
+使用 ESP-IDF 6.1，推荐通过 [ESP-IDF Installation Manager（EIM）](https://docs.espressif.com/projects/idf-im-ui/en/latest/) 下载和安装。
+
+每次打开终端后，先激活环境。Bash/Zsh 使用：
+
+```bash
+source ~/.espressif/tools/activate_idf_v6.1.sh
+```
+
+Fish 使用：
+
+```fish
+source ~/.espressif/tools/activate_idf_v6.1.fish
+```
+
+激活环境后，从乐鑫组件中心下载的 `espressif/esp_board_manager` 扩展属于 ESP-IDF 的受信任来源，本流程无需手动设置 `IDF_EXTENSION_ALLOW_UNTRUSTED` 即可使用 `bmgr` 命令。
+
+从乐鑫组件中心获取示例工程：
+
+```shell
+idf.py create-project-from-example "guition/guition_boards=0.2.1:display_lv_demo_widgets"
+cd display_lv_demo_widgets
+```
+
+该命令要求组件中心已发布的 `0.2.1` 包含 `display_lv_demo_widgets` 示例。`create-project-from-example` 创建独立的示例工程，后续配置或构建时自动下载组件依赖；仅执行 `add-dependency` 不会获取示例工程。示例已声明 `guition/guition_boards: "*"`，无须再次添加依赖。若需固定组件版本，在配置或构建前，将 `main/idf_component.yml` 中 `guition/guition_boards` 的版本改为 `"==0.2.1"`。
+
+使用本地仓库中的示例时，进入仓库的 `example/display/display_lv_demo_widgets` 目录即可；其板级支持仍由组件中心提供，首次解析依赖时下载满足工程约束的最新版本，也可按上述方式在清单中固定版本。
 
 以 `jc8012p4a1` 为例，在工程目录执行：
 
 ```shell
-. "$IDF_PATH/export.sh"
-export IDF_EXTENSION_ALLOW_UNTRUSTED=1
 idf.py set-target esp32p4
 idf.py bmgr -b jc8012p4a1
 idf.py menuconfig
@@ -12,7 +35,7 @@ idf.py build
 idf.py -p PORT flash monitor
 ```
 
-`IDF_EXTENSION_ALLOW_UNTRUSTED=1` 用于加载 ESP Board Manager 的 `bmgr` 命令扩展。将 `PORT` 替换为实际串口。`idf.py bmgr -l` 可列出支持的开发板；使用其他板型时，选择对应的芯片目标和开发板名称。
+将 `PORT` 替换为实际串口。`idf.py bmgr -l` 可列出支持的开发板；使用其他板型时，选择对应的芯片目标和开发板名称。
 
 `jc2432w328` 的触摸类型在 `idf.py menuconfig` 的 `Component config → Guition touch → Touch variant` 中选择：`No touch`（默认）、`Capacitive touch`（CST820）或 `Resistive touch (XPT2046)`。选择须与实际硬件一致；保存配置后执行 `idf.py reconfigure` 和 `idf.py build`，组件管理器会按触摸类型解析对应驱动依赖。
 

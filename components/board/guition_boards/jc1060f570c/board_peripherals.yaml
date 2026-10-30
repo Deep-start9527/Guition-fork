@@ -57,7 +57,7 @@ peripherals:
     type: ledc
     version: default
     config:
-      gpio_num: 17
+      gpio_num: 52
       speed_mode: LEDC_LOW_SPEED_MODE
       freq_hz: 20000
       duty_resolution: "LEDC_TIMER_10_BIT"

@@ -1,5 +1,22 @@
 # Generated SD overlay: tools/guition/sd_boards.py
 peripherals:
+  # PDM-to-PCM conversion is available on I2S0.
+  - name: i2s_audio_in
+    type: i2s
+    role: master
+    format: pdm-in
+    config:
+      port: 0
+      sample_rate_hz: 16000
+      data_bit_width: 16
+      slot_mode: I2S_SLOT_MODE_STEREO
+      slot_mask: I2S_PDM_SLOT_BOTH
+      data_fmt: I2S_PDM_DATA_FMT_PCM
+      dn_sample_mode: I2S_PDM_DSR_8S
+      pins:
+        clk: 45
+        din: 46
+
   - name: spi_display
     type: spi
     config:

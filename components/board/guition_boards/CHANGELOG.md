@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1
+
+- Add `audio_adc` PDM input on I2S0 for `jc3636f118`, `jc3636k518`, `jc3636k718` and `jc3636w518`, with PDM-to-PCM conversion and default 16 kHz, 16-bit stereo capture.
+- Add `audio_dac` standard Philips I2S output on I2S1 for `jc3636f118`, `jc3636k718` and `jc3636w518`, using `chip: internal` and a software dummy codec with default 48 kHz, 16-bit stereo playback.
+- Configure active-high amplifier control on GPIO46 for `jc3636k718` and GPIO48 for `jc3636w518`, with an initial low level.
+- Correct the `jc1060f570c` PWM backlight pin from GPIO17 to GPIO52.
+
 ## 0.2.0
 
 - Add the `jc5454f328` ESP32-S31 board definition to the component and board catalog, replacing the example-local copy.
