@@ -1,5 +1,14 @@
 # Generated SD overlay: tools/guition/sd_boards.py
 devices:
+  - name: audio_adc
+    type: audio_codec
+    chip: internal
+    config:
+      adc_enabled: true
+      dac_enabled: false
+    peripherals:
+      - i2s_name: i2s_audio_in
+
   - name: display_lcd
     type: display_lcd
     version: 1.0.0
