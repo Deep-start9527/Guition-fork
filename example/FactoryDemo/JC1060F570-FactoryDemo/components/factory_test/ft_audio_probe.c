@@ -1,330 +1,268 @@
 /** SPDX-License-Identifier: GPL-2.0-only */
 #include "ft_audio_probe.h"
 
+#include <math.h>
 #include <string.h>
-
 #include "audio_input.h"
 #include "audio_output.h"
 #include "audio_runtime.h"
-#include "esp_attr.h"
 #include "esp_codec_dev.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/idf_additions.h"
 #include "freertos/task.h"
+#include "spectrum_fft.h"
 
 #define FT_AUDIO_TAG "FactoryTestAudio"
-
-/** @brief One codec transaction per chunk keeps the worker responsive to the stop flag. */
-#define FT_AUDIO_CHUNK_FRAMES 1024U
-#define FT_AUDIO_WORKER_STACK 4096U
+#define FT_AUDIO_CHUNK_FRAMES 256U
+#define FT_AUDIO_WORKER_STACK 6144U
 #define FT_AUDIO_WORKER_PRIORITY 5
 #define FT_AUDIO_SETTLE_TIMEOUT_MS 3000U
 #define FT_AUDIO_SETTLE_STEP_MS 10U
 
-/** Allocate the 16 kHz, 16-bit mono recording and staging buffers in PSRAM for the page lifetime. */
-static int16_t *s_take;
-static int16_t *s_capture_chunk;
-static int16_t *s_play_chunk;
+static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
+static bool s_running;
+static bool s_stop_requested;
+static ft_audio_probe_state_t s_state = FT_AUDIO_IDLE;
+static esp_err_t s_last_error = ESP_OK;
+static uint32_t s_sequence;
+static float s_levels[2][FT_AUDIO_SPECTRUM_BARS];
 
-static void buffers_release(void)
-{
-    heap_caps_free(s_take);
-    heap_caps_free(s_capture_chunk);
-    heap_caps_free(s_play_chunk);
-    s_take = NULL;
-    s_capture_chunk = NULL;
-    s_play_chunk = NULL;
-}
-
-/**
- * @brief Free partially allocated buffers only when no worker is running.
- * @return true if the required buffers are available.
- */
-static bool buffers_ensure(void)
-{
-    if (s_take == NULL) {
-        s_take = heap_caps_malloc(FT_AUDIO_MONO_FRAMES * sizeof(int16_t), MALLOC_CAP_SPIRAM);
-    }
-    if (s_capture_chunk == NULL) {
-        s_capture_chunk = heap_caps_malloc(FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_ADC_CHANNELS *
-                                           sizeof(int16_t),
-                                           MALLOC_CAP_SPIRAM);
-    }
-    if (s_play_chunk == NULL) {
-        s_play_chunk = heap_caps_malloc(FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_DAC_CHANNELS *
-                                        sizeof(int16_t),
-                                        MALLOC_CAP_SPIRAM);
-    }
-    if (s_take == NULL || s_capture_chunk == NULL || s_play_chunk == NULL) {
-        ESP_LOGE(FT_AUDIO_TAG, "audio buffers unavailable (%u bytes wanted)",
-                 (unsigned)((FT_AUDIO_MONO_FRAMES + FT_AUDIO_CHUNK_FRAMES *
-                             (FT_AUDIO_ADC_CHANNELS + FT_AUDIO_DAC_CHANNELS)) *
-                            sizeof(int16_t)));
-        buffers_release();
-        return false;
-    }
-    return true;
-}
-
-static TaskHandle_t s_worker;
-static volatile bool s_stop_requested;
-static volatile bool s_have_take;
-static volatile ft_audio_probe_state_t s_state = FT_AUDIO_IDLE;
-static volatile esp_err_t s_last_error = ESP_OK;
-
-static size_t audio_chunk_frames(size_t remaining)
-{
-    return remaining > FT_AUDIO_CHUNK_FRAMES ? FT_AUDIO_CHUNK_FRAMES : remaining;
-}
-
-/** @brief Match the DAC to the 16 kHz capture rate while the shared I2S input is open; restore its format afterward. */
 typedef struct {
     bool runtime_acquired;
     bool output_was_open;
     bool output_reconfigured;
+    bool input_opened;
     esp_codec_dev_sample_info_t previous_output_format;
 } audio_session_t;
 
 static esp_err_t session_begin(audio_session_t *session)
 {
     memset(session, 0, sizeof(*session));
-
-    if (audio_runtime_acquire() != ESP_OK) {
-        return ESP_ERR_INVALID_STATE;
-    }
+    esp_err_t result = audio_runtime_acquire();
+    if (result != ESP_OK) return result;
     session->runtime_acquired = true;
-
+    /* An existing capture belongs to another page and must not be closed here. */
+    if (audio_input_is_open()) return ESP_ERR_INVALID_STATE;
     session->output_was_open = audio_output_is_open();
-    if (!session->output_was_open) {
-        return ESP_OK;
-    }
-    if (audio_output_get_format(&session->previous_output_format) != ESP_OK) {
-        return ESP_FAIL;
-    }
-    const esp_codec_dev_sample_info_t capture_peer = {
-        .sample_rate = FT_AUDIO_SAMPLE_RATE,
-        .channel = FT_AUDIO_DAC_CHANNELS,
+    if (session->output_was_open &&
+        audio_output_get_format(&session->previous_output_format) != ESP_OK) return ESP_FAIL;
+    const esp_codec_dev_sample_info_t output = {
+        .sample_rate = FT_AUDIO_SAMPLE_RATE, .channel = FT_AUDIO_DAC_CHANNELS,
         .bits_per_sample = FT_AUDIO_BITS,
     };
-    if (audio_output_reconfigure(&capture_peer) != ESP_OK) {
-        return ESP_FAIL;
-    }
+    result = audio_output_reconfigure(&output);
+    if (result != ESP_OK) return result;
     session->output_reconfigured = true;
-    return ESP_OK;
+    const esp_codec_dev_sample_info_t input = {
+        .sample_rate = FT_AUDIO_SAMPLE_RATE, .channel = FT_AUDIO_ADC_CHANNELS,
+        .bits_per_sample = FT_AUDIO_BITS,
+    };
+    result = audio_input_open(&input);
+    session->input_opened = result == ESP_OK;
+    return result;
 }
 
-static void session_end(audio_session_t *session, bool input_opened)
+static esp_err_t session_end(audio_session_t *session)
 {
-    if (input_opened) {
-        (void)audio_input_close();
-    }
+    esp_err_t result = ESP_OK;
+    if (session->input_opened && audio_input_close() != ESP_OK) result = ESP_FAIL;
     if (session->output_reconfigured) {
-        const esp_err_t ret = session->output_was_open
-                                  ? audio_output_reconfigure(&session->previous_output_format)
-                                  : audio_output_close();
-        if (ret != ESP_OK) {
-            ESP_LOGW(FT_AUDIO_TAG, "output format restore failed: %s", esp_err_to_name(ret));
+        esp_err_t restored = session->output_was_open
+            ? audio_output_reconfigure(&session->previous_output_format) : audio_output_close();
+        if (restored != ESP_OK) result = restored;
+    }
+    if (session->runtime_acquired && audio_runtime_release() != ESP_OK) result = ESP_FAIL;
+    return result;
+}
+
+static void publish_spectrum(const spectrum_fft_t *fft)
+{
+    float levels[2][FT_AUDIO_SPECTRUM_BARS];
+    for (unsigned mic = 0; mic < 2; ++mic) {
+        const float *magnitudes = spectrum_fft_microphone_magnitudes(fft, mic);
+        for (unsigned bar = 0; bar < FT_AUDIO_SPECTRUM_BARS; ++bar) {
+            const float low = 100.0f * powf(80.0f, (float)bar / FT_AUDIO_SPECTRUM_BARS);
+            const float high = 100.0f * powf(80.0f, (float)(bar + 1) / FT_AUDIO_SPECTRUM_BARS);
+            unsigned first = (unsigned)ceilf(low * SPECTRUM_FFT_SIZE / FT_AUDIO_SAMPLE_RATE);
+            unsigned end = (unsigned)ceilf(high * SPECTRUM_FFT_SIZE / FT_AUDIO_SAMPLE_RATE);
+            if (end > SPECTRUM_FFT_BINS) end = SPECTRUM_FFT_BINS;
+            float peak = 0.0f;
+            for (unsigned bin = first; bin < end; ++bin) {
+                if (magnitudes[bin] > peak) peak = magnitudes[bin];
+            }
+            float level = peak > 0.001f ? (20.0f * log10f(peak) + 60.0f) / 60.0f : 0.0f;
+            levels[mic][bar] = level > 1.0f ? 1.0f : level;
         }
     }
-    if (session->runtime_acquired) {
-        (void)audio_runtime_release();
-    }
+    portENTER_CRITICAL(&s_lock);
+    memcpy(s_levels, levels, sizeof(s_levels));
+    ++s_sequence;
+    portEXIT_CRITICAL(&s_lock);
 }
 
-static void worker_finish(esp_err_t result)
+static void audio_worker(void *argument)
 {
+    (void)argument;
+    int16_t *capture = heap_caps_malloc(FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_ADC_CHANNELS * sizeof(int16_t), MALLOC_CAP_SPIRAM);
+    int16_t *output = heap_caps_malloc(FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_DAC_CHANNELS * sizeof(int16_t), MALLOC_CAP_SPIRAM);
+    spectrum_fft_t *fft = heap_caps_malloc(sizeof(*fft), MALLOC_CAP_SPIRAM);
+    audio_session_t session = {0};
+    esp_err_t result = ESP_ERR_NO_MEM;
+    if (capture && output && fft &&
+        spectrum_fft_init(fft, FT_AUDIO_SAMPLE_RATE, FT_AUDIO_ADC_CHANNELS, FT_AUDIO_BITS)) {
+        result = session_begin(&session);
+    }
+    esp_codec_dev_handle_t input_codec = audio_input_get_codec_dev();
+    esp_codec_dev_handle_t output_codec = audio_output_get_codec_dev();
+    if (result == ESP_OK && (!input_codec || !output_codec)) result = ESP_ERR_INVALID_STATE;
+    portENTER_CRITICAL(&s_lock);
+    if (result == ESP_OK && !s_stop_requested) s_state = FT_AUDIO_CAPTURING;
+    portEXIT_CRITICAL(&s_lock);
+    uint32_t windows = 0;
+    while (result == ESP_OK) {
+        portENTER_CRITICAL(&s_lock);
+        bool stop = s_stop_requested;
+        ft_audio_probe_state_t mode = s_state;
+        portEXIT_CRITICAL(&s_lock);
+        if (stop) break;
+        if (esp_codec_dev_read(input_codec, capture,
+                FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_ADC_CHANNELS * sizeof(int16_t)) != ESP_CODEC_DEV_OK) {
+            result = ESP_FAIL;
+            break;
+        }
+        memset(output, 0, FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_DAC_CHANNELS * sizeof(int16_t));
+        for (size_t frame = 0; frame < FT_AUDIO_CHUNK_FRAMES; ++frame) {
+            int16_t sample = 0;
+            if (mode == FT_AUDIO_MONITOR_LEFT || mode == FT_AUDIO_MONITOR_RIGHT) {
+                sample = capture[frame * FT_AUDIO_ADC_CHANNELS + (mode == FT_AUDIO_MONITOR_RIGHT ? 2U : 0U)];
+            }
+            output[frame * 2] = sample;
+            output[frame * 2 + 1] = sample;
+        }
+        /** Keep TX supplied even during capture so the shared full-duplex clock remains active. */
+        if (esp_codec_dev_write(output_codec, output,
+                FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_DAC_CHANNELS * sizeof(int16_t)) != ESP_CODEC_DEV_OK) {
+            result = ESP_FAIL;
+            break;
+        }
+        spectrum_fft_feed(fft, (const uint8_t *)capture,
+                          FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_ADC_CHANNELS * sizeof(int16_t));
+        if (fft->windows_processed != windows) {
+            windows = fft->windows_processed;
+            publish_spectrum(fft);
+        }
+    }
+    /* Flush silence after monitoring so queued DAC data cannot repeat on the next page. */
+    if (session.output_reconfigured && output_codec && output) {
+        memset(output, 0, FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_DAC_CHANNELS * sizeof(int16_t));
+        if (esp_codec_dev_write(output_codec, output,
+                FT_AUDIO_CHUNK_FRAMES * FT_AUDIO_DAC_CHANNELS * sizeof(int16_t)) != ESP_CODEC_DEV_OK && result == ESP_OK) result = ESP_FAIL;
+    }
+    esp_err_t teardown = session_end(&session);
+    if (result == ESP_OK) result = teardown;
+    heap_caps_free(capture);
+    heap_caps_free(output);
+    heap_caps_free(fft);
+    portENTER_CRITICAL(&s_lock);
     s_last_error = result;
-    s_state = FT_AUDIO_IDLE;
-    s_worker = NULL;
+    s_state = result == ESP_OK ? FT_AUDIO_IDLE : FT_AUDIO_ERROR;
+    s_running = false;
+    portEXIT_CRITICAL(&s_lock);
     vTaskDeleteWithCaps(NULL);
 }
 
-static void record_worker(void *argument)
+esp_err_t ft_audio_probe_start(void)
 {
-    (void)argument;
-    audio_session_t session;
-    esp_err_t result = session_begin(&session);
-    bool input_opened = false;
-    size_t captured = 0U;
-
-    if (result == ESP_OK) {
-        const esp_codec_dev_sample_info_t capture_format = {
-            .sample_rate = FT_AUDIO_SAMPLE_RATE,
-            .channel = FT_AUDIO_ADC_CHANNELS,
-            .bits_per_sample = FT_AUDIO_BITS,
-        };
-        if (audio_input_open(&capture_format) != ESP_OK) {
-            result = ESP_FAIL;
-        } else {
-            input_opened = true;
-        }
-    }
-
-    esp_codec_dev_handle_t codec = input_opened ? audio_input_get_codec_dev() : NULL;
-    if (input_opened && codec == NULL) {
-        result = ESP_ERR_INVALID_STATE;
-    }
-
-    while (result == ESP_OK && captured < FT_AUDIO_MONO_FRAMES && !s_stop_requested) {
-        const size_t frames = audio_chunk_frames(FT_AUDIO_MONO_FRAMES - captured);
-        const int read_ret = esp_codec_dev_read(
-            codec, s_capture_chunk,
-            (int)(frames * FT_AUDIO_ADC_CHANNELS * sizeof(int16_t)));
-        if (read_ret != ESP_CODEC_DEV_OK) {
-            ESP_LOGE(FT_AUDIO_TAG, "codec read failed: %d", read_ret);
-            result = ESP_FAIL;
-            break;
-        }
-        for (size_t index = 0U; index < frames; ++index) {
-            s_take[captured + index] = s_capture_chunk[index * FT_AUDIO_ADC_CHANNELS];
-        }
-        captured += frames;
-    }
-
-    if (result == ESP_OK) {
-        if (captured == FT_AUDIO_MONO_FRAMES) {
-            s_have_take = true;
-            ESP_LOGI(FT_AUDIO_TAG, "recorded %u frames", (unsigned)captured);
-        } else {
-            /** Aborted by the page: the partial take is not a usable recording. */
-            s_have_take = false;
-            result = ESP_ERR_INVALID_STATE;
-        }
-    }
-
-    session_end(&session, input_opened);
-    worker_finish(result);
-}
-
-static void playback_worker(void *argument)
-{
-    (void)argument;
-    audio_session_t session;
-    esp_err_t result = session_begin(&session);
-    if (result == ESP_OK) {
-        const esp_codec_dev_sample_info_t playback_format = {
-            .sample_rate = FT_AUDIO_SAMPLE_RATE,
-            .channel = FT_AUDIO_DAC_CHANNELS,
-            .bits_per_sample = FT_AUDIO_BITS,
-        };
-        if (audio_output_reconfigure(&playback_format) != ESP_OK) {
-            result = ESP_FAIL;
-        } else {
-            /** Mark the restored shared-codec format for playback-session restoration. */
-            session.output_reconfigured = true;
-        }
-    }
-
-    esp_codec_dev_handle_t codec = result == ESP_OK ? audio_output_get_codec_dev() : NULL;
-    if (result == ESP_OK && codec == NULL) {
-        result = ESP_ERR_INVALID_STATE;
-    }
-
-    size_t played = 0U;
-    while (result == ESP_OK && played < FT_AUDIO_MONO_FRAMES && !s_stop_requested) {
-        const size_t frames = audio_chunk_frames(FT_AUDIO_MONO_FRAMES - played);
-        for (size_t index = 0U; index < frames; ++index) {
-            const int16_t sample = s_take[played + index];
-            s_play_chunk[index * FT_AUDIO_DAC_CHANNELS] = sample;
-            s_play_chunk[index * FT_AUDIO_DAC_CHANNELS + 1U] = sample;
-        }
-        const int write_ret = esp_codec_dev_write(
-            codec, s_play_chunk,
-            (int)(frames * FT_AUDIO_DAC_CHANNELS * sizeof(int16_t)));
-        if (write_ret != ESP_CODEC_DEV_OK) {
-            ESP_LOGE(FT_AUDIO_TAG, "codec write failed: %d", write_ret);
-            result = ESP_FAIL;
-            break;
-        }
-        played += frames;
-    }
-
-    session_end(&session, false);
-    worker_finish(result);
-}
-
-static esp_err_t worker_start(TaskFunction_t entry, ft_audio_probe_state_t state)
-{
-    if (s_worker != NULL || s_state != FT_AUDIO_IDLE) {
+    portENTER_CRITICAL(&s_lock);
+    if (s_running) {
+        portEXIT_CRITICAL(&s_lock);
         return ESP_ERR_INVALID_STATE;
     }
-
+    s_running = true;
     s_stop_requested = false;
     s_last_error = ESP_OK;
-    s_state = state;
-    /** Allocate the worker stack in PSRAM. */
-    if (xTaskCreatePinnedToCoreWithCaps(entry, "ft_audio", FT_AUDIO_WORKER_STACK, NULL,
-                                        FT_AUDIO_WORKER_PRIORITY, &s_worker, 1,
-                                        MALLOC_CAP_SPIRAM) != pdPASS) {
-        s_worker = NULL;
-        s_state = FT_AUDIO_IDLE;
+    s_state = FT_AUDIO_STARTING;
+    s_sequence = 0;
+    memset(s_levels, 0, sizeof(s_levels));
+    portEXIT_CRITICAL(&s_lock);
+    if (xTaskCreatePinnedToCoreWithCaps(audio_worker, "ft_audio", FT_AUDIO_WORKER_STACK, NULL,
+            FT_AUDIO_WORKER_PRIORITY, NULL, 1, MALLOC_CAP_SPIRAM) != pdPASS) {
+        portENTER_CRITICAL(&s_lock);
+        s_running = false;
+        s_state = FT_AUDIO_ERROR;
         s_last_error = ESP_ERR_NO_MEM;
-        ESP_LOGE(FT_AUDIO_TAG, "audio worker task allocation failed");
+        portEXIT_CRITICAL(&s_lock);
         return ESP_ERR_NO_MEM;
     }
     return ESP_OK;
 }
 
-esp_err_t ft_audio_probe_record_start(void)
+static esp_err_t request_mode(ft_audio_probe_state_t mode)
 {
-    /** A new take supersedes the previous one, so nothing stale can be played. */
-    s_have_take = false;
-    if (s_worker == NULL && !buffers_ensure()) {
-        return ESP_ERR_NO_MEM;
-    }
-    return worker_start(record_worker, FT_AUDIO_RECORDING);
-}
-
-esp_err_t ft_audio_probe_play_start(void)
-{
-    if (!s_have_take) {
+    portENTER_CRITICAL(&s_lock);
+    if (!s_running || s_stop_requested ||
+        (s_state != FT_AUDIO_CAPTURING && s_state != FT_AUDIO_MONITOR_LEFT && s_state != FT_AUDIO_MONITOR_RIGHT)) {
+        portEXIT_CRITICAL(&s_lock);
         return ESP_ERR_INVALID_STATE;
     }
-    if (s_worker == NULL && !buffers_ensure()) {
-        return ESP_ERR_NO_MEM;
-    }
-    return worker_start(playback_worker, FT_AUDIO_PLAYING);
+    s_state = mode;
+    portEXIT_CRITICAL(&s_lock);
+    return ESP_OK;
 }
 
+esp_err_t ft_audio_probe_monitor_set(ft_audio_monitor_t monitor)
+{
+    switch (monitor) {
+    case FT_AUDIO_MONITOR_OFF: return request_mode(FT_AUDIO_CAPTURING);
+    case FT_AUDIO_MONITOR_SELECT_LEFT: return request_mode(FT_AUDIO_MONITOR_LEFT);
+    case FT_AUDIO_MONITOR_SELECT_RIGHT: return request_mode(FT_AUDIO_MONITOR_RIGHT);
+    default: return ESP_ERR_INVALID_ARG;
+    }
+}
 void ft_audio_probe_stop(void)
 {
-    s_stop_requested = true;
+    portENTER_CRITICAL(&s_lock);
+    if (s_running) {
+        s_stop_requested = true;
+        s_state = FT_AUDIO_STOPPING;
+    }
+    portEXIT_CRITICAL(&s_lock);
 }
-
 void ft_audio_probe_cleanup(void)
 {
-    s_stop_requested = true;
-
-    /** Wait a bounded time for worker-owned codec teardown and runtime release. */
-    for (uint32_t waited = 0U; waited < FT_AUDIO_SETTLE_TIMEOUT_MS && s_worker != NULL;
-         waited += FT_AUDIO_SETTLE_STEP_MS) {
+    ft_audio_probe_stop();
+    for (uint32_t waited = 0; waited < FT_AUDIO_SETTLE_TIMEOUT_MS; waited += FT_AUDIO_SETTLE_STEP_MS) {
+        portENTER_CRITICAL(&s_lock);
+        bool running = s_running;
+        portEXIT_CRITICAL(&s_lock);
+        if (!running) return;
         vTaskDelay(pdMS_TO_TICKS(FT_AUDIO_SETTLE_STEP_MS));
     }
-    if (s_worker != NULL) {
-        ESP_LOGE(FT_AUDIO_TAG, "audio worker did not stop; leaving it to finish");
-    }
-
-    s_have_take = false;
-    s_state = FT_AUDIO_IDLE;
-    /** Keep recording buffers allocated until the worker stops using them. */
-    if (s_worker == NULL) {
-        buffers_release();
-    }
+    ESP_LOGE(FT_AUDIO_TAG, "audio shutdown timed out; worker retains ownership");
 }
-
-bool ft_audio_probe_has_recording(void)
-{
-    return s_have_take;
-}
-
 ft_audio_probe_state_t ft_audio_probe_state(void)
 {
-    return s_state;
+    portENTER_CRITICAL(&s_lock);
+    ft_audio_probe_state_t value = s_state;
+    portEXIT_CRITICAL(&s_lock);
+    return value;
 }
-
 esp_err_t ft_audio_probe_last_error(void)
 {
-    return s_last_error;
+    portENTER_CRITICAL(&s_lock);
+    esp_err_t value = s_last_error;
+    portEXIT_CRITICAL(&s_lock);
+    return value;
+}
+bool ft_audio_probe_spectrum_snapshot(float levels[2][FT_AUDIO_SPECTRUM_BARS], uint32_t *sequence)
+{
+    if (!levels) return false;
+    portENTER_CRITICAL(&s_lock);
+    memcpy(levels, s_levels, sizeof(s_levels));
+    if (sequence) *sequence = s_sequence;
+    bool available = s_sequence != 0;
+    portEXIT_CRITICAL(&s_lock);
+    return available;
 }

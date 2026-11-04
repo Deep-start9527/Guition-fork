@@ -68,6 +68,7 @@ static void spectrum_fft_compute_radix2(spectrum_fft_t *fft)
         for (size_t i = 0; i < SPECTRUM_FFT_BINS; ++i) {
             const float magnitude = sqrtf(fft->real[i] * fft->real[i] +
                                           fft->imag[i] * fft->imag[i]) * scale;
+            fft->microphone_magnitudes[microphone][i] = magnitude;
             if (microphone == 0U) {
                 fft->magnitudes[i] = magnitude;
             } else {
@@ -155,6 +156,13 @@ const float *spectrum_fft_magnitudes(const spectrum_fft_t *fft)
     return fft == NULL ? NULL : fft->magnitudes;
 }
 
+const float *spectrum_fft_microphone_magnitudes(const spectrum_fft_t *fft,
+                                             uint8_t microphone)
+{
+    return fft == NULL || microphone >= SPECTRUM_MICROPHONE_COUNT ?
+           NULL : fft->microphone_magnitudes[microphone];
+}
+
 uint32_t spectrum_fft_windows_processed(const spectrum_fft_t *fft)
 {
     return fft == NULL ? 0U : fft->windows_processed;
@@ -173,6 +181,13 @@ void spectrum_fft_apply_noise_gate(spectrum_fft_t *fft)
         low_cut_bin = SPECTRUM_DC_BINS;
     }
     for (size_t i = 0; i < SPECTRUM_FFT_BINS; ++i) {
+        for (size_t microphone = 0; microphone < SPECTRUM_MICROPHONE_COUNT;
+             ++microphone) {
+            const float value = fft->microphone_magnitudes[microphone][i];
+            fft->microphone_magnitudes[microphone][i] =
+                i < low_cut_bin || value <= SPECTRUM_NOISE_GATE_MIN ?
+                0.0f : value - SPECTRUM_NOISE_GATE_MIN;
+        }
         if (i < low_cut_bin) {
             fft->magnitudes[i] = 0.0f;
             continue;

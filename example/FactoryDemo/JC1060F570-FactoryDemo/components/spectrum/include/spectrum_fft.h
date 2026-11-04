@@ -24,6 +24,7 @@ typedef struct {
     int16_t microphone_samples[SPECTRUM_MICROPHONE_COUNT][SPECTRUM_FFT_SIZE]; /**< Only ch0 and ch2 are microphone inputs; retain their windows only. */
     uint8_t pending_frame[2U * SPECTRUM_MAX_CHANNELS];
     float magnitudes[SPECTRUM_FFT_BINS];
+    float microphone_magnitudes[SPECTRUM_MICROPHONE_COUNT][SPECTRUM_FFT_BINS];
     float window[SPECTRUM_FFT_SIZE];
     float real[SPECTRUM_FFT_SIZE];
     float imag[SPECTRUM_FFT_SIZE];
@@ -51,7 +52,7 @@ void spectrum_fft_reset(spectrum_fft_t *fft);
 void spectrum_fft_deinit(spectrum_fft_t *fft);
 
 /**
- * @brief Consume interleaved PCM, retaining an incomplete trailing frame for the next call. Combine microphone channels 0 and 2 before FFT.
+ * @brief Consume interleaved PCM, retaining an incomplete trailing frame for the next call. Transform TD0 and TD2 independently and combine their powers.
  * @param fft FFT state.
  * @param data Interleaved PCM bytes.
  * @param len Number of PCM bytes supplied.
@@ -65,6 +66,14 @@ size_t spectrum_fft_feed(spectrum_fft_t *fft, const uint8_t *data, size_t len);
  * @return Borrowed half-spectrum magnitude array.
  */
 const float *spectrum_fft_magnitudes(const spectrum_fft_t *fft);
+/**
+ * @brief Borrow an independent microphone half-spectrum with the fixed noise gate.
+ * @param fft FFT state.
+ * @param microphone Microphone index: 0 is left TD0; 1 is right TD2.
+ * @return Magnitudes valid until the next completed window/reset, or NULL for invalid input.
+ */
+const float *spectrum_fft_microphone_magnitudes(const spectrum_fft_t *fft,
+                                             uint8_t microphone);
 /**
  * @brief Return the number of completed FFT windows.
  * @param fft FFT state.

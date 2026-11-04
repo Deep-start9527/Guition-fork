@@ -8,6 +8,7 @@ idf_component_register(
     REQUIRES
         heap
         audio_runtime
+        spectrum
         esp_board_manager
         esp_codec_dev
         sdmmc
