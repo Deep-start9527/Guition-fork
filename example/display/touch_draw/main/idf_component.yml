@@ -1,0 +1,8 @@
+dependencies:
+  idf:
+    version: '>=6.1.0'
+  espressif/esp_board_manager: '==0.7.3~1'
+  guition/guition_boards: '*'
+  lvgl/lvgl: '==9.6.0'
+  espressif/esp_lvgl_adapter: '==0.7.1'
+  espressif/esp_lcd_touch_gt911: '==1.2.1'

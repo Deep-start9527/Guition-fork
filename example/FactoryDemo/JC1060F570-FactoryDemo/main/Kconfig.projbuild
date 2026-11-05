@@ -39,16 +39,22 @@ menu "FactoryDemo Configuration"
     config FACTORY_UART_TX_GPIO
         int "UART TX GPIO"
         range -1 61
+        default 53 if ESP_BOARD_JC8048F550 || ESP_BOARD_JC8048F543
+        default 14 if ESP_BOARD_JC1060F570C
         default 18
         help
             GPIO used for UART TX. Set to -1 to leave the TX signal unused.
+            JC8048F550 / JC8048F543 use fixed UART1 TX GPIO53.
 
     config FACTORY_UART_RX_GPIO
         int "UART RX GPIO"
         range -1 61
+        default 52 if ESP_BOARD_JC8048F550 || ESP_BOARD_JC8048F543
+        default 11 if ESP_BOARD_JC1060F570C
         default 19
         help
             GPIO used for UART RX. Set to -1 to leave the RX signal unused.
+            JC8048F550 / JC8048F543 use fixed UART1 RX GPIO52.
 
     config FACTORY_UART_BAUD_RATE
         int "UART baud rate"
@@ -75,3 +81,63 @@ menu "FactoryDemo Configuration"
     endif
 
 endmenu
+
+# Application defaults follow the selected board's Ethernet hardware.
+config ETHERNET_INIT_DEFAULT_ETH_DISABLED
+    default y if !ESP_BOARD_JC1060F570C
+
+config ETHERNET_INIT_OVERRIDE_DISABLE
+    default y if ESP_BOARD_JC8048F550 || ESP_BOARD_JC8048F543
+
+config ETHERNET_INTERNAL_SUPPORT
+    default y if ESP_BOARD_JC1060F570C
+
+if ESP_BOARD_JC1060F570C && ETHERNET_INTERNAL_SUPPORT
+
+choice ETHERNET_PHY_INTERFACE
+    default ETHERNET_PHY_INTERFACE_RMII
+endchoice
+
+choice ETHERNET_PHY_MODEL
+    default ETHERNET_PHY_IP101
+endchoice
+
+if ETHERNET_PHY_INTERFACE_RMII
+
+choice ETHERNET_RMII_CLK_MODE
+    default ETHERNET_RMII_CLK_INPUT
+endchoice
+
+config ETHERNET_RMII_CLK_GPIO
+    default 13
+
+config ETHERNET_RMII_TX_EN_GPIO
+    default 12
+
+config ETHERNET_RMII_TXD0_GPIO
+    default 8
+
+config ETHERNET_RMII_TXD1_GPIO
+    default 9
+
+config ETHERNET_RMII_CRS_DV_GPIO
+    default 15
+
+config ETHERNET_RMII_RXD0_GPIO
+    default 19
+
+config ETHERNET_RMII_RXD1_GPIO
+    default 18
+
+endif
+
+config ETHERNET_MDC_GPIO
+    default 53
+
+config ETHERNET_MDIO_GPIO
+    default 10
+
+config ETHERNET_PHY_RST_GPIO
+    default 17
+
+endif

@@ -1,4 +1,4 @@
-if(CONFIG_ESP_BOARD_JC8048F550)
+if(CONFIG_ESP_BOARD_JC8048F550 OR CONFIG_ESP_BOARD_JC8048F543)
     set(DESKTOP_ICON_RESOLUTION 800x480)
 else()
     # Match the SPIFFS selection below, including its fresh-worktree default.
@@ -48,6 +48,7 @@ idf_component_register(
         "ui/wifi/app_wifi_provisioning_view.c"
         "ui/wifi/app_wifi_widgets.c"
         "ui/ethernet/app_ethernet_view.c"
+        "ui/gpio/app_gpio_view.c"
         "web/settings_server.c"
         "web/standby_web.c"
         "ui/serial/app_serial_ui.c"
@@ -82,6 +83,7 @@ idf_component_register(
         "ui/video"
         "ui/wifi"
         "ui/ethernet"
+        "ui/gpio"
         "web"
         "ui/weather"
         "ui/clock"
@@ -98,9 +100,9 @@ idf_component_register(
 if(CONFIG_ESP_BOARD_JC1060F570C)
     set(ASSETS_SPIFFS_DIR ../spiffs/1024x600)
     message(STATUS "SPIFFS assets: 1024x600 (JC1060F570C)")
-elseif(CONFIG_ESP_BOARD_JC8048F550)
+elseif(CONFIG_ESP_BOARD_JC8048F550 OR CONFIG_ESP_BOARD_JC8048F543)
     set(ASSETS_SPIFFS_DIR ../spiffs/800x480)
-    message(STATUS "SPIFFS assets: 800x480 (JC8048F550)")
+    message(STATUS "SPIFFS assets: 800x480 (JC8048F550 / JC8048F543)")
 else()
     # A fresh worktree has no sdkconfig yet, so CONFIG_ESP_BOARD_* stays undefined
     # until `idf.py bmgr -b jc1060f570c` writes it. Default to the 1024x600 set

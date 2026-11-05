@@ -1,0 +1,13 @@
+menu "Demo display"
+
+config DEMO_TOUCH_POINTERS
+    int "Touch pointer count"
+    range 1 ESP_LCD_TOUCH_MAX_POINTS if ESP_LCD_TOUCH_MAX_POINTS < 5
+    range 1 5
+    default 5
+    help
+        Number of touch pointers exposed to LVGL. One uses single-touch
+        mode; larger values use multi-control mode. Simultaneous contacts
+        also depend on the touch controller's capabilities.
+
+endmenu

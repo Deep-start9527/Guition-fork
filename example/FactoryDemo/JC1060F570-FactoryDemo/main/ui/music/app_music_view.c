@@ -34,7 +34,7 @@
 #define MUSIC_ARM_ANIM_MS 450
 #define MUSIC_DISC_TURN_MS 10000
 #define MUSIC_POLL_MS 500
-#if CONFIG_ESP_BOARD_JC8048F550
+#if CONFIG_ESP_BOARD_JC8048F550 || CONFIG_ESP_BOARD_JC8048F543
 
 #define MUSIC_DISC_PIVOT_X 128
 #define MUSIC_DISC_PIVOT_Y 128
@@ -363,7 +363,7 @@ static void music_set_lyric_text(lv_obj_t *label, const char *text)
     if (label == NULL) {
         return;
     }
-#if CONFIG_ESP_BOARD_JC8048F550
+#if CONFIG_ESP_BOARD_JC8048F550 || CONFIG_ESP_BOARD_JC8048F543
     lv_obj_set_style_text_font(label, desktop_font_get_artist(), 0);
 #else
     lv_obj_set_style_text_font(label, desktop_font_get_lyric(), 0);
@@ -376,7 +376,7 @@ static void music_set_artist_text(lv_obj_t *label, const char *text)
     if (label == NULL) {
         return;
     }
-#if CONFIG_ESP_BOARD_JC8048F550
+#if CONFIG_ESP_BOARD_JC8048F550 || CONFIG_ESP_BOARD_JC8048F543
     lv_obj_set_style_text_font(label, desktop_font_get_title(), 0);
 #else
     lv_obj_set_style_text_font(label, desktop_font_get_artist(), 0);

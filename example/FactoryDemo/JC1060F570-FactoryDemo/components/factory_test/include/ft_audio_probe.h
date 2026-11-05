@@ -31,7 +31,7 @@ typedef enum {
 
 /** Start the page session; capture continues until stop or cleanup. */
 esp_err_t ft_audio_probe_start(void);
-/** Select TD0 (left) or TD2 (right), copied to both DAC channels. */
+/** Select TH0/TH1 (left mic/reference) or TH2/TH3 (right mic/reference); AEC output feeds both DAC channels. */
 esp_err_t ft_audio_probe_monitor_set(ft_audio_monitor_t monitor);
 /** Request session shutdown; the worker owns codec teardown. */
 void ft_audio_probe_stop(void);
@@ -39,7 +39,7 @@ void ft_audio_probe_stop(void);
 void ft_audio_probe_cleanup(void);
 ft_audio_probe_state_t ft_audio_probe_state(void);
 esp_err_t ft_audio_probe_last_error(void);
-/** Copy TD0/TD2 levels [0,1], fixed -60..0 dBFS and 32 logarithmic bands 100..8000 Hz. */
+/** Copy TH0/TH2 levels [0,1], fixed -60..0 dBFS and 32 logarithmic bands 100..8000 Hz. */
 bool ft_audio_probe_spectrum_snapshot(float levels[2][FT_AUDIO_SPECTRUM_BARS], uint32_t *sequence);
 #ifdef __cplusplus
 }

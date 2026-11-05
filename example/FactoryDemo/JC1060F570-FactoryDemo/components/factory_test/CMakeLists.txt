@@ -12,4 +12,6 @@ idf_component_register(
         esp_board_manager
         esp_codec_dev
         sdmmc
+    PRIV_REQUIRES
+        esp-sr
 )
