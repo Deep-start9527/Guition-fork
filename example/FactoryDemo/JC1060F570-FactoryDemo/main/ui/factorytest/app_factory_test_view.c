@@ -52,7 +52,7 @@
 #define FT_DIALOG_WIDTH 460
 #define FT_DIALOG_HEIGHT 200
 #define FT_WIFI_POLL_MS 500
-#define FT_AUDIO_POLL_MS 200
+#define FT_AUDIO_POLL_MS 100
 #define FT_RTC_POLL_MS 200
 #define FT_RTC_TIMEOUT_MS 5000
 #define FT_DETAIL_MAX 160
@@ -103,7 +103,11 @@ static lv_obj_t *s_eth_phy_label;
 static lv_obj_t *s_eth_link_label;
 static lv_obj_t *s_wifi_list;
 static lv_obj_t *s_audio_state_label;
-static lv_obj_t *s_audio_take_label;
+static lv_obj_t *s_audio_buttons[3];
+static lv_obj_t *s_audio_plots[2];
+static float s_audio_levels[2][FT_AUDIO_SPECTRUM_BARS];
+static uint32_t s_audio_spectrum_sequence;
+static bool s_audio_failed;
 static lv_obj_t *s_rtc_label;
 static lv_obj_t *s_rtc_detail_label;
 static i2c_master_dev_handle_t s_rtc_device;
@@ -298,7 +302,8 @@ static void ft_forget_menu_pointers(void)
     s_eth_link_label = NULL;
     s_wifi_list = NULL;
     s_audio_state_label = NULL;
-    s_audio_take_label = NULL;
+    memset(s_audio_buttons, 0, sizeof(s_audio_buttons));
+    memset(s_audio_plots, 0, sizeof(s_audio_plots));
     s_rtc_label = NULL;
     s_rtc_detail_label = NULL;
     for (size_t index = 0U; index < FT_ITEM_COUNT; ++index) {
@@ -324,7 +329,7 @@ static void ft_back_cb(lv_event_t *event)
 {
     (void)event;
 
-    ft_audio_probe_stop();
+    ft_audio_probe_cleanup();
     ft_clean_stage();
     app_ft_touch_view_cleanup();
     ft_stop_timers();
@@ -763,22 +768,76 @@ static void ft_start_wifi_view(void)
     }
 }
 
+static void ft_audio_plot_cb(lv_event_t *event)
+{
+    const size_t microphone = (size_t)(uintptr_t)lv_event_get_user_data(event);
+    lv_obj_t *plot = lv_event_get_target(event);
+    lv_layer_t *layer = lv_event_get_layer(event);
+    lv_area_t area;
+    lv_obj_get_content_coords(plot, &area);
+    const int32_t width = lv_area_get_width(&area);
+    const int32_t height = lv_area_get_height(&area);
+    if (width < FT_AUDIO_SPECTRUM_BARS || height < 1) {
+        return;
+    }
+    lv_draw_rect_dsc_t rect;
+    lv_draw_rect_dsc_init(&rect);
+    rect.bg_opa = LV_OPA_COVER;
+    rect.bg_color = C_DIVIDER;
+    for (int grid = 0; grid <= 3; ++grid) {
+        const int32_t y = area.y2 - (height - 1) * grid / 3;
+        const lv_area_t line = {area.x1, y, area.x2, y};
+        lv_draw_rect(layer, &rect, &line);
+    }
+    rect.bg_color = microphone == 0U ? C_ACCENT : C_SUCCESS;
+    for (size_t bar = 0; bar < FT_AUDIO_SPECTRUM_BARS; ++bar) {
+        const int32_t bar_height = (int32_t)(s_audio_levels[microphone][bar] * (height - 1));
+        if (bar_height <= 0) {
+            continue;
+        }
+        const lv_area_t column = {
+            area.x1 + (int32_t)bar * width / FT_AUDIO_SPECTRUM_BARS,
+            area.y2 - bar_height,
+            area.x1 + (int32_t)(bar + 1U) * width / FT_AUDIO_SPECTRUM_BARS - 2,
+            area.y2,
+        };
+        lv_draw_rect(layer, &rect, &column);
+    }
+}
+
 static void ft_audio_render(void)
 {
     const ft_audio_probe_state_t state = ft_audio_probe_state();
-    if (s_audio_state_label != NULL) {
-        const char *text = L(DESKTOP_TEXT_FACTORY_AUDIO_IDLE);
-        if (state == FT_AUDIO_RECORDING) {
-            text = L(DESKTOP_TEXT_FACTORY_AUDIO_RECORDING);
-        } else if (state == FT_AUDIO_PLAYING) {
-            text = L(DESKTOP_TEXT_FACTORY_AUDIO_PLAYING);
-        }
-        lv_label_set_text(s_audio_state_label, text);
+    desktop_text_key_t key = DESKTOP_TEXT_FACTORY_AUDIO_IDLE;
+    switch (state) {
+    case FT_AUDIO_STARTING: key = DESKTOP_TEXT_FACTORY_AUDIO_STARTING; break;
+    case FT_AUDIO_CAPTURING: key = DESKTOP_TEXT_FACTORY_AUDIO_CAPTURING; break;
+    case FT_AUDIO_MONITOR_LEFT: key = DESKTOP_TEXT_FACTORY_AUDIO_LISTENING_LEFT; break;
+    case FT_AUDIO_MONITOR_RIGHT: key = DESKTOP_TEXT_FACTORY_AUDIO_LISTENING_RIGHT; break;
+    case FT_AUDIO_STOPPING: key = DESKTOP_TEXT_FACTORY_AUDIO_STOPPING; break;
+    case FT_AUDIO_ERROR: key = DESKTOP_TEXT_FACTORY_AUDIO_FAILED; break;
+    default: break;
     }
-    if (s_audio_take_label != NULL) {
-        lv_label_set_text(s_audio_take_label,
-                          ft_audio_probe_has_recording() ? L(DESKTOP_TEXT_FACTORY_AUDIO_TAKE_READY)
-                                                         : L(DESKTOP_TEXT_FACTORY_AUDIO_NO_TAKE));
+    if (s_audio_state_label != NULL) {
+        lv_label_set_text(s_audio_state_label, L(key));
+    }
+    const bool ready = state == FT_AUDIO_CAPTURING || state == FT_AUDIO_MONITOR_LEFT ||
+                       state == FT_AUDIO_MONITOR_RIGHT;
+    for (size_t i = 0; i < 3; ++i) {
+        if (s_audio_buttons[i] == NULL) {
+            continue;
+        }
+        const bool enabled = ready && (i != 2U || state != FT_AUDIO_CAPTURING);
+        if (enabled) {
+            lv_obj_remove_state(s_audio_buttons[i], LV_STATE_DISABLED);
+        } else {
+            lv_obj_add_state(s_audio_buttons[i], LV_STATE_DISABLED);
+        }
+        lv_obj_set_style_opa(s_audio_buttons[i], enabled ? LV_OPA_COVER : LV_OPA_50, 0);
+        const bool selected = (i == 0U && state == FT_AUDIO_MONITOR_LEFT) ||
+                              (i == 1U && state == FT_AUDIO_MONITOR_RIGHT);
+        lv_obj_set_style_border_width(s_audio_buttons[i], selected ? 2 : 0, 0);
+        lv_obj_set_style_border_color(s_audio_buttons[i], C_ACCENT, 0);
     }
 }
 
@@ -793,75 +852,45 @@ static void ft_audio_stop_polling(void)
 static void ft_audio_poll_cb(lv_timer_t *timer)
 {
     (void)timer;
-    if (ft_audio_probe_state() != FT_AUDIO_IDLE) {
-        ft_audio_render();
-        return;
-    }
-
-    ft_audio_stop_polling();
     ft_audio_render();
-    const esp_err_t error = ft_audio_probe_last_error();
-    if (error == ESP_OK) {
-        s_results[FT_ITEM_AUDIO] = FACTORY_TEST_RESULT_PASS;
-        ft_set_detail(L(DESKTOP_TEXT_FACTORY_AUDIO_DONE));
-    } else {
+    uint32_t sequence = 0;
+    float levels[2][FT_AUDIO_SPECTRUM_BARS];
+    if (ft_audio_probe_spectrum_snapshot(levels, &sequence) &&
+        sequence != s_audio_spectrum_sequence) {
+        s_audio_spectrum_sequence = sequence;
+        memcpy(s_audio_levels, levels, sizeof(s_audio_levels));
+        for (size_t i = 0; i < 2; ++i) {
+            if (s_audio_plots[i] != NULL) {
+                lv_obj_invalidate(s_audio_plots[i]);
+            }
+        }
+    }
+    if (!s_audio_failed && ft_audio_probe_last_error() != ESP_OK) {
+        s_audio_failed = true;
         s_results[FT_ITEM_AUDIO] = FACTORY_TEST_RESULT_FAIL;
         ft_set_detail(L(DESKTOP_TEXT_FACTORY_AUDIO_FAILED));
-    }
-    ft_render_results();
-}
-
-static void ft_audio_start_polling(void)
-{
-    ft_audio_stop_polling();
-    s_poll_timer = lv_timer_create(ft_audio_poll_cb, FT_AUDIO_POLL_MS, NULL);
-    if (s_poll_timer == NULL) {
-        ESP_LOGE(FT_TAG, "audio poll timer allocation failed");
-    }
-}
-
-/**
- * @brief Release music playback before using the shared codec for recording.
- * @param event LVGL event that triggered the callback.
- */
-static void ft_audio_record_cb(lv_event_t *event)
-{
-    (void)event;
-
-    (void)music_player_service_return_home();
-    const esp_err_t ret = ft_audio_probe_record_start();
-    if (ret != ESP_OK) {
-        ft_toast(L(DESKTOP_TEXT_FACTORY_AUDIO_FAILED));
-        s_results[FT_ITEM_AUDIO] = FACTORY_TEST_RESULT_FAIL;
         ft_render_results();
-        return;
+        memset(s_audio_levels, 0, sizeof(s_audio_levels));
+        for (size_t i = 0; i < 2; ++i) {
+            if (s_audio_plots[i] != NULL) {
+                lv_obj_invalidate(s_audio_plots[i]);
+            }
+        }
     }
-    s_results[FT_ITEM_AUDIO] = FACTORY_TEST_RESULT_RUNNING;
-    ft_render_results();
-    ft_audio_render();
-    ft_audio_start_polling();
 }
 
-static void ft_audio_play_cb(lv_event_t *event)
+static void ft_audio_action_cb(lv_event_t *event)
 {
-    (void)event;
-    if (!ft_audio_probe_has_recording()) {
-        ft_toast(L(DESKTOP_TEXT_FACTORY_AUDIO_NO_TAKE));
-        ft_set_detail(L(DESKTOP_TEXT_FACTORY_AUDIO_NO_TAKE));
-        return;
-    }
-    (void)music_player_service_return_home();
-    const esp_err_t ret = ft_audio_probe_play_start();
-    if (ret != ESP_OK) {
+    const size_t action = (size_t)(uintptr_t)lv_event_get_user_data(event);
+    const ft_audio_monitor_t mode = action == 0U ? FT_AUDIO_MONITOR_SELECT_LEFT :
+                                   action == 1U ? FT_AUDIO_MONITOR_SELECT_RIGHT :
+                                                  FT_AUDIO_MONITOR_OFF;
+    const esp_err_t result = ft_audio_probe_monitor_set(mode);
+    if (result != ESP_OK) {
         ft_toast(L(DESKTOP_TEXT_FACTORY_AUDIO_FAILED));
-        s_results[FT_ITEM_AUDIO] = FACTORY_TEST_RESULT_FAIL;
-        ft_render_results();
         return;
     }
-    s_results[FT_ITEM_AUDIO] = FACTORY_TEST_RESULT_RUNNING;
-    ft_render_results();
     ft_audio_render();
-    ft_audio_start_polling();
 }
 
 static void ft_start_audio_view(void)
@@ -871,25 +900,81 @@ static void ft_start_audio_view(void)
     if (card == NULL) {
         return;
     }
+    lv_obj_set_style_pad_row(card, 8, 0);
+    memset(s_audio_levels, 0, sizeof(s_audio_levels));
+    s_audio_spectrum_sequence = 0;
+    s_audio_failed = false;
 
+    const desktop_text_key_t button_keys[3] = {
+        DESKTOP_TEXT_FACTORY_AUDIO_LISTEN_LEFT, DESKTOP_TEXT_FACTORY_AUDIO_LISTEN_RIGHT,
+        DESKTOP_TEXT_FACTORY_AUDIO_LISTEN_STOP,
+    };
     lv_obj_t *buttons = lv_obj_create(card);
     ft_style_plain(buttons, C_SURFACE, 0);
-    lv_obj_set_width(buttons, LV_PCT(100));
-    lv_obj_set_height(buttons, 56);
+    lv_obj_set_size(buttons, LV_PCT(100), 42);
     lv_obj_set_flex_flow(buttons, LV_FLEX_FLOW_ROW);
-    lv_obj_set_style_pad_column(buttons, 12, 0);
+    lv_obj_set_style_pad_column(buttons, 8, 0);
     lv_obj_clear_flag(buttons, LV_OBJ_FLAG_SCROLLABLE);
-
-    lv_obj_t *record = ft_button(buttons, L(DESKTOP_TEXT_FACTORY_AUDIO_RECORD), C_ACCENT_SOFT,
-                                 ft_audio_record_cb, NULL);
-    lv_obj_set_size(record, 200, 52);
-    lv_obj_t *play = ft_button(buttons, L(DESKTOP_TEXT_FACTORY_AUDIO_PLAY), C_ACCENT_SOFT,
-                               ft_audio_play_cb, NULL);
-    lv_obj_set_size(play, 200, 52);
-
+    for (size_t i = 0; i < 3; ++i) {
+        s_audio_buttons[i] = ft_button(buttons, L(button_keys[i]), C_ACCENT_SOFT,
+                                      ft_audio_action_cb, (void *)(uintptr_t)i);
+        lv_obj_set_size(s_audio_buttons[i], 0, 42);
+        lv_obj_set_flex_grow(s_audio_buttons[i], 1);
+    }
     s_audio_state_label = ft_label(card, "", C_INK);
-    s_audio_take_label = ft_label(card, "", C_INK_MUTED);
+
+    lv_obj_t *spectra = lv_obj_create(card);
+    ft_style_plain(spectra, C_SURFACE, 0);
+    lv_obj_set_width(spectra, LV_PCT(100));
+    lv_obj_set_height(spectra, 0);
+    lv_obj_set_flex_grow(spectra, 1);
+    lv_obj_set_flex_flow(spectra, LV_FLEX_FLOW_ROW);
+    lv_obj_set_style_pad_column(spectra, 12, 0);
+    lv_obj_clear_flag(spectra, LV_OBJ_FLAG_SCROLLABLE);
+    for (size_t i = 0; i < 2; ++i) {
+        lv_obj_t *panel = lv_obj_create(spectra);
+        ft_style_plain(panel, C_SURFACE, 0);
+        lv_obj_set_size(panel, 0, LV_PCT(100));
+        lv_obj_set_flex_grow(panel, 1);
+        lv_obj_set_flex_flow(panel, LV_FLEX_FLOW_COLUMN);
+        lv_obj_set_style_pad_row(panel, 2, 0);
+        lv_obj_clear_flag(panel, LV_OBJ_FLAG_SCROLLABLE);
+        ft_label(panel, L(i == 0U ? DESKTOP_TEXT_FACTORY_AUDIO_MIC_LEFT :
+                                    DESKTOP_TEXT_FACTORY_AUDIO_MIC_RIGHT), C_INK);
+        ft_label(panel, L(DESKTOP_TEXT_FACTORY_AUDIO_SCALE), C_INK_MUTED);
+        s_audio_plots[i] = lv_obj_create(panel);
+        ft_style_plain(s_audio_plots[i], C_SURFACE, 0);
+        lv_obj_set_size(s_audio_plots[i], LV_PCT(100), 0);
+        lv_obj_set_flex_grow(s_audio_plots[i], 1);
+        lv_obj_clear_flag(s_audio_plots[i], LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_add_event_cb(s_audio_plots[i], ft_audio_plot_cb, LV_EVENT_DRAW_MAIN,
+                            (void *)(uintptr_t)i);
+        lv_obj_t *axis = ft_label(panel, L(DESKTOP_TEXT_FACTORY_AUDIO_AXIS), C_INK_MUTED);
+        lv_obj_set_width(axis, LV_PCT(100));
+        lv_obj_set_style_text_align(axis, LV_TEXT_ALIGN_CENTER, 0);
+    }
+
+    ft_audio_stop_polling();
+    esp_err_t ret = music_player_service_return_home();
+    if (ret == ESP_OK) {
+        ret = ft_audio_probe_start();
+    }
     ft_audio_render();
+    if (ret != ESP_OK) {
+        lv_label_set_text(s_audio_state_label, L(DESKTOP_TEXT_FACTORY_AUDIO_FAILED));
+        s_results[FT_ITEM_AUDIO] = FACTORY_TEST_RESULT_FAIL;
+        ft_set_detail(L(DESKTOP_TEXT_FACTORY_AUDIO_FAILED));
+        ft_render_results();
+        return;
+    }
+    s_poll_timer = lv_timer_create(ft_audio_poll_cb, FT_AUDIO_POLL_MS, NULL);
+    if (s_poll_timer == NULL) {
+        ft_audio_probe_cleanup();
+        ft_audio_render();
+        lv_label_set_text(s_audio_state_label, L(DESKTOP_TEXT_FACTORY_AUDIO_FAILED));
+        s_results[FT_ITEM_AUDIO] = FACTORY_TEST_RESULT_FAIL;
+        ft_render_results();
+    }
 }
 
 static void ft_rtc_finish(esp_err_t error)
@@ -1225,7 +1310,8 @@ void app_factory_test_view_cleanup(void)
     s_eth_link_label = NULL;
     s_wifi_list = NULL;
     s_audio_state_label = NULL;
-    s_audio_take_label = NULL;
+    memset(s_audio_buttons, 0, sizeof(s_audio_buttons));
+    memset(s_audio_plots, 0, sizeof(s_audio_plots));
     s_rtc_label = NULL;
     s_rtc_detail_label = NULL;
     for (size_t index = 0U; index < FT_ITEM_COUNT; ++index) {

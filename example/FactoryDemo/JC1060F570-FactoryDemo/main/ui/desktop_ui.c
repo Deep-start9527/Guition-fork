@@ -25,6 +25,8 @@
 #include "video/desktop_boot_video.h"
 #include "app_wifi_view.h"
 #include "app_ethernet_view.h"
+#include "app_gpio_view.h"
+#include "board_capabilities.h"
 #include "serial/app_serial_ui.h"
 #include "music_player_service.h"
 #include "video_player_service.h"
@@ -171,12 +173,6 @@ typedef struct {
     const char *literal_value;
 } localized_info_pair_t;
 
-typedef enum {
-    GPIO_PIN_4,
-    GPIO_PIN_7,
-    GPIO_PIN_8,
-} gpio_pin_id_t;
-
 #define INFO_TEXT(label, value) {label, value, NULL}
 #define INFO_LITERAL(label, value) {label, DESKTOP_TEXT_KEY_COUNT, value}
 
@@ -316,7 +312,7 @@ static const void *app_icon_source(const app_entry_t *app)
 /** @brief Desktop shortcut order and page membership. */
 static const uint8_t s_pages[DESKTOP_PAGE_COUNT][DESKTOP_APPS_PER_PAGE] = {
     {APP_TOUCH, APP_SETTINGS, APP_WIFI,
-#if CONFIG_ETHERNET_PHY_IP101
+#if FACTORY_BOARD_HAS_ETHERNET && CONFIG_ETHERNET_PHY_IP101
      APP_ETHERNET,
 #else
      APP_GPIO,
@@ -330,7 +326,7 @@ static const uint8_t s_pages[DESKTOP_PAGE_COUNT][DESKTOP_APPS_PER_PAGE] = {
 static const uint8_t s_page_counts[DESKTOP_PAGE_COUNT] = {10, 5};
 static const desktop_text_key_t s_page_label_keys[DESKTOP_PAGE_COUNT][DESKTOP_APPS_PER_PAGE] = {
     {DESKTOP_TEXT_APP_TOUCH, DESKTOP_TEXT_APP_SETTINGS, DESKTOP_TEXT_APP_WIFI,
-#if CONFIG_ETHERNET_PHY_IP101
+#if FACTORY_BOARD_HAS_ETHERNET && CONFIG_ETHERNET_PHY_IP101
      DESKTOP_TEXT_APP_ETHERNET,
 #else
      DESKTOP_TEXT_APP_GPIO,
@@ -961,6 +957,7 @@ static void close_full_cb(lv_event_t *event)
     app_wifi_view_cleanup();
     i2ctools_view_cleanup();
     app_ethernet_view_cleanup();
+    app_gpio_view_cleanup();
     app_serial_ui_destroy();
     app_photo_view_cleanup();
     app_settings_view_destroy();
@@ -1310,55 +1307,9 @@ static void build_calculator(void)
     }
 }
 
-static void gpio_cb(lv_event_t *event)
-{
-    lv_obj_t *sw = lv_event_get_target_obj(event);
-    gpio_pin_id_t pin_id = (gpio_pin_id_t)(uintptr_t)lv_event_get_user_data(event);
-    const char *pin = pin_id == GPIO_PIN_7 ? "GPIO 7" : pin_id == GPIO_PIN_8 ? "GPIO 8" : "GPIO 4";
-    char message[48];
-    snprintf(message, sizeof(message), L(DESKTOP_TEXT_GPIO_OUTPUT_FEEDBACK), pin,
-             lv_obj_has_state(sw, LV_STATE_CHECKED) ? L(DESKTOP_TEXT_SETTINGS_ENABLED) : L(DESKTOP_TEXT_CLOSE));
-    show_toast(message);
-}
-
-static void gpio_row(lv_obj_t *parent, gpio_pin_id_t pin_id, const char *pin,
-                     const char *description, bool checked)
-{
-    lv_obj_t *row = lv_obj_create(parent);
-    style_plain(row, C_SURFACE, 14);
-    lv_obj_set_width(row, LV_PCT(100));
-    lv_obj_set_height(row, 72);
-    lv_obj_t *pin_label = make_label(row, pin, C_INK, 0, 0);
-    lv_obj_align(pin_label, LV_ALIGN_LEFT_MID, 16, -12);
-    lv_obj_t *description_label = make_label(row, description, C_INK_MUTED, 0, 0);
-    lv_obj_align_to(description_label, pin_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, 5);
-    lv_obj_t *sw = lv_switch_create(row);
-    lv_obj_set_size(sw, 48, 28);
-    lv_obj_align(sw, LV_ALIGN_RIGHT_MID, -16, 0);
-    if (checked) lv_obj_add_state(sw, LV_STATE_CHECKED);
-    lv_obj_add_event_cb(sw, gpio_cb, LV_EVENT_VALUE_CHANGED, (void *)(uintptr_t)pin_id);
-}
-
 static void build_gpio(void)
 {
-    desktop_fullscreen_layout_t layout;
-    if (!build_standard_layout(APP_GPIO, &layout)) {
-        return;
-    }
-    lv_obj_t *summary = desktop_fullscreen_layout_create_panel(
-        layout.content, C_CANVAS, 38, 0, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(summary, 8, 0);
-    flex_info_card(summary, L(DESKTOP_TEXT_GPIO_INPUT), "GPIO 4 / 5", 84);
-    flex_info_card(summary, L(DESKTOP_TEXT_GPIO_OUTPUT), "GPIO 7 / 8", 84);
-    flex_info_card(summary, L(DESKTOP_TEXT_GPIO_PWM), L(DESKTOP_TEXT_GPIO_CHANNEL_COUNT), 84);
-    flex_info_card(summary, L(DESKTOP_TEXT_GPIO_ADC), "12 bit", 84);
-
-    lv_obj_t *controls = desktop_fullscreen_layout_create_panel(
-        layout.content, C_CANVAS, 61, 0, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(controls, 10, 0);
-    gpio_row(controls, GPIO_PIN_4, "GPIO 4", L(DESKTOP_TEXT_GPIO_4), true);
-    gpio_row(controls, GPIO_PIN_7, "GPIO 7", L(DESKTOP_TEXT_GPIO_7), true);
-    gpio_row(controls, GPIO_PIN_8, "GPIO 8", L(DESKTOP_TEXT_GPIO_8), false);
+    app_gpio_view_build(s_full_body, show_toast);
 }
 
 static void diagnostics_run_cb(lv_event_t *event)
@@ -2657,7 +2608,9 @@ static void build_full_screen(app_id_t id)
         return;
     }
     app_wifi_view_cleanup();
+    i2ctools_view_cleanup();
     app_ethernet_view_cleanup();
+    app_gpio_view_cleanup();
     app_serial_ui_destroy();
     (void)video_player_service_exit();
     app_video_player_view_cleanup();
@@ -3237,11 +3190,12 @@ static void create_modal(void)
     s_modal = lv_obj_create(s_root);
     style_plain(s_modal, C_SYSTEM, 0);
     lv_obj_set_style_bg_opa(s_modal, LV_OPA_50, 0);
-    lv_obj_set_size(s_modal, PAD_W, PAD_H);
+    lv_obj_set_size(s_modal, s_screen_width, s_screen_height);
     lv_obj_set_pos(s_modal, 0, 0);
     lv_obj_add_event_cb(s_modal, modal_backdrop_cb, LV_EVENT_CLICKED, NULL);
 
-    s_modal_panel = make_card(s_modal, 252, 60, 520, 480);
+    s_modal_panel = make_card(s_modal, 0, 0, 520, 480);
+    lv_obj_center(s_modal_panel);
     lv_obj_add_flag(s_modal_panel, LV_OBJ_FLAG_EVENT_BUBBLE);
     make_label(s_modal_panel, "Desktop", C_SYSTEM_TEXT, 24, 22);
     s_modal_title = make_label(s_modal_panel, L(DESKTOP_TEXT_APP_STATUS), C_INK, 72, 19);
@@ -3615,6 +3569,7 @@ void desktop_ui_create(void)
     app_music_view_cleanup();
     spectrum_app_stop();
     app_ethernet_view_cleanup();
+    app_gpio_view_cleanup();
     app_touch_view_cleanup();
     app_photo_view_cleanup();
 

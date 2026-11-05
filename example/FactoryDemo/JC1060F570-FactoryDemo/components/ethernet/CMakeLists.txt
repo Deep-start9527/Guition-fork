@@ -5,6 +5,7 @@ idf_component_register(
     INCLUDE_DIRS
         "include"
     REQUIRES
+        board_capabilities
         esp_eth
         esp_event
         esp_netif

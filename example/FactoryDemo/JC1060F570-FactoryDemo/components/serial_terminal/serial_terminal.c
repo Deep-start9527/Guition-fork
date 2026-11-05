@@ -1,4 +1,5 @@
 #include "serial_terminal.h"
+#include "board_capabilities.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -71,7 +72,7 @@ static void receive_task(void *arg)
     uint8_t data[256];
 
     while (true) {
-        int received = uart_read_bytes(CONFIG_FACTORY_UART_PORT, data, sizeof(data),
+        int received = uart_read_bytes(FACTORY_BOARD_UART_PORT, data, sizeof(data),
                                        pdMS_TO_TICKS(SERIAL_TERMINAL_READ_TIMEOUT_MS));
         if (received <= 0) {
             if (line_length > 0) {
@@ -118,40 +119,40 @@ esp_err_t serial_terminal_init(void)
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
         .source_clk = UART_SCLK_DEFAULT,
     };
-    esp_err_t err = uart_driver_install(CONFIG_FACTORY_UART_PORT, CONFIG_FACTORY_UART_RX_BUFFER_SIZE,
+    esp_err_t err = uart_driver_install(FACTORY_BOARD_UART_PORT, CONFIG_FACTORY_UART_RX_BUFFER_SIZE,
                                         CONFIG_FACTORY_UART_RX_BUFFER_SIZE, 0, NULL, 0);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "uart_driver_install failed: %s", esp_err_to_name(err));
         s_history_mutex = NULL;
         return err;
     }
-    err = uart_param_config(CONFIG_FACTORY_UART_PORT, &config);
+    err = uart_param_config(FACTORY_BOARD_UART_PORT, &config);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "uart_param_config failed: %s", esp_err_to_name(err));
-        uart_driver_delete(CONFIG_FACTORY_UART_PORT);
+        uart_driver_delete(FACTORY_BOARD_UART_PORT);
         s_history_mutex = NULL;
         return err;
     }
-    err = uart_set_pin(CONFIG_FACTORY_UART_PORT, CONFIG_FACTORY_UART_TX_GPIO,
-                       CONFIG_FACTORY_UART_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    err = uart_set_pin(FACTORY_BOARD_UART_PORT, FACTORY_BOARD_UART_TX_GPIO,
+                       FACTORY_BOARD_UART_RX_GPIO, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "uart_set_pin failed: %s", esp_err_to_name(err));
-        uart_driver_delete(CONFIG_FACTORY_UART_PORT);
+        uart_driver_delete(FACTORY_BOARD_UART_PORT);
         s_history_mutex = NULL;
         return err;
     }
     if (xTaskCreate(receive_task, "uart_rx", SERIAL_TERMINAL_RX_TASK_STACK_SIZE, NULL,
                     SERIAL_TERMINAL_RX_TASK_PRIORITY, NULL) != pdPASS) {
         ESP_LOGE(TAG, "Failed to create UART RX task");
-        uart_driver_delete(CONFIG_FACTORY_UART_PORT);
+        uart_driver_delete(FACTORY_BOARD_UART_PORT);
         s_history_mutex = NULL;
         return ESP_ERR_NO_MEM;
     }
 
     s_ready = true;
     ESP_LOGI(TAG, "UART%d ready at %d baud, TX=%d RX=%d",
-             CONFIG_FACTORY_UART_PORT, CONFIG_FACTORY_UART_BAUD_RATE,
-             CONFIG_FACTORY_UART_TX_GPIO, CONFIG_FACTORY_UART_RX_GPIO);
+             FACTORY_BOARD_UART_PORT, CONFIG_FACTORY_UART_BAUD_RATE,
+             FACTORY_BOARD_UART_TX_GPIO, FACTORY_BOARD_UART_RX_GPIO);
     return ESP_OK;
 }
 
@@ -178,7 +179,7 @@ esp_err_t serial_terminal_send(const char *text)
         line[wire_length++] = '\r';
         line[wire_length++] = '\n';
     }
-    int written = uart_write_bytes(CONFIG_FACTORY_UART_PORT, line, wire_length);
+    int written = uart_write_bytes(FACTORY_BOARD_UART_PORT, line, wire_length);
     if (written != (int)wire_length) {
         return ESP_FAIL;
     }

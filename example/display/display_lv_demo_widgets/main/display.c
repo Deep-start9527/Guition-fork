@@ -153,6 +153,10 @@ esp_err_t display_init(void)
     if (touch) {
         esp_lv_adapter_touch_config_t touch_config = {
             .disp = s_disp, .handle = touch, .scale = { .x = 1.0f, .y = 1.0f },
+            .multi_touch = {
+                .mode = CONFIG_DEMO_TOUCH_POINTERS == 1 ? ESP_LV_ADAPTER_TOUCH_MODE_SINGLE : ESP_LV_ADAPTER_TOUCH_MODE_MULTI_CONTROL,
+                .pointers = CONFIG_DEMO_TOUCH_POINTERS,
+            },
         };
         demo_display_rotation_touch(&touch_config);
         s_touch_indev = esp_lv_adapter_register_touch(&touch_config);

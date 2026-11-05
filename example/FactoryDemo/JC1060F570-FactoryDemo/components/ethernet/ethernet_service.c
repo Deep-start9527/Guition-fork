@@ -1,4 +1,5 @@
 #include "ethernet_service.h"
+#include "board_capabilities.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,9 +22,9 @@
 #define ETHERNET_SERVICE_EVENT_POLL_MS 100
 #define ETHERNET_SERVICE_PHY_POLL_MS 1000
 
-#if (defined(CONFIG_ETHERNET_INTERNAL_SUPPORT) && CONFIG_ETHERNET_INTERNAL_SUPPORT) || \
+#if FACTORY_BOARD_HAS_ETHERNET && ((defined(CONFIG_ETHERNET_INTERNAL_SUPPORT) && CONFIG_ETHERNET_INTERNAL_SUPPORT) || \
     (defined(CONFIG_ETHERNET_SPI_SUPPORT) && CONFIG_ETHERNET_SPI_SUPPORT) || \
-    (defined(CONFIG_ETHERNET_OPENETH_SUPPORT) && CONFIG_ETHERNET_OPENETH_SUPPORT)
+    (defined(CONFIG_ETHERNET_OPENETH_SUPPORT) && CONFIG_ETHERNET_OPENETH_SUPPORT))
 #define FACTORY_ETHERNET_CONFIGURED 1
 #else
 #define FACTORY_ETHERNET_CONFIGURED 0
@@ -651,7 +652,7 @@ esp_err_t ethernet_service_init(void)
 
 #if !FACTORY_ETHERNET_CONFIGURED
     mark_unavailable(UNAVAILABLE_INIT, ESP_ERR_INVALID_STATE);
-    ESP_LOGW(ETHERNET_SERVICE_TAG, "Ethernet runtime unavailable: no official Ethernet transport is configured");
+    ESP_LOGW(ETHERNET_SERVICE_TAG, "Ethernet runtime unavailable: board has no Ethernet hardware or transport is not configured");
     vSemaphoreDelete(s_dhcp_renew_lock);
     s_dhcp_renew_lock = NULL;
     vSemaphoreDelete(s_lock);
